@@ -1,0 +1,303 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id           String          @id @default(uuid())
+  email        String          @unique
+  name         String
+  passwordHash String
+  tradingMode  String          @default("PAPER") // PAPER or LIVE
+  paperBalance Float           @default(1000000.0) // 10 Lakh Virtual INR
+  createdAt    DateTime        @default(now())
+  updatedAt    DateTime        @updatedAt
+  
+  brokerAccounts BrokerAccount[]
+  brokerSessions BrokerSession[]
+  watchlists     Watchlist[]
+  holdings       Holding[]
+  positions      Position[]
+  orders         Order[]
+  trades         Trade[]
+  paperOrders    PaperOrder[]
+  paperTrades    PaperTrade[]
+  alerts         Alert[]
+  backtests      Backtest[]
+  auditLogs      AuditLog[]
+}
+
+model BrokerAccount {
+  id           String   @id @default(uuid())
+  userId       String
+  brokerName   String   @default("KOTAK_NEO")
+  ucc          String
+  mobileNumber String
+  accessToken  String?
+  isActive     Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model BrokerSession {
+  id           String   @id @default(uuid())
+  userId       String
+  viewToken    String?
+  viewSid      String?
+  sessionToken String?
+  sessionSid   String?
+  baseUrl      String?
+  dataCenter   String?
+  isValid      Boolean  @default(true)
+  expiresAt    DateTime?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model Instrument {
+  id              String   @id @default(uuid())
+  symbol          String   // e.g. TCS
+  exchangeSegment String   // e.g. nse_cm
+  tradingSymbol   String   // e.g. TCS-EQ
+  name            String?
+  lotSize         Int      @default(1)
+  expiryDate      String?
+  tickSize        Float    @default(0.05)
+  instrumentToken String   @unique
+  series          String   @default("EQ")
+  sector          String?
+
+  watchlistItems WatchlistItem[]
+}
+
+model NewsArticle {
+  id          String   @id @default(uuid())
+  title       String
+  description String?
+  content     String?
+  source      String
+  url         String   @unique
+  publishedAt DateTime
+  company     String?
+  symbol      String?
+  sector      String?
+  hash        String   @unique
+  sentiment   String?  // POSITIVE, NEUTRAL, NEGATIVE
+  confidence  Float?   @default(0.0)
+  score       Float?   @default(0.0) // -1.0 to 1.0
+  createdAt   DateTime @default(now())
+
+  sentimentResults SentimentResult[]
+}
+
+model SentimentResult {
+  id          String   @id @default(uuid())
+  symbol      String
+  articleId   String?
+  score       Float    // -1.0 to +1.0
+  confidence  Float    // 0.0 to 1.0
+  label       String   // POSITIVE, NEUTRAL, NEGATIVE
+  positivePct Float
+  neutralPct  Float
+  negativePct Float
+  timestamp   DateTime @default(now())
+
+  newsArticle NewsArticle? @relation(fields: [articleId], references: [id], onDelete: SetNull)
+
+  @@index([symbol])
+}
+
+model Watchlist {
+  id        String   @id @default(uuid())
+  userId    String
+  name      String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user  User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  items WatchlistItem[]
+}
+
+model WatchlistItem {
+  id           String   @id @default(uuid())
+  watchlistId  String
+  instrumentId String
+  addedAt      DateTime @default(now())
+
+  watchlist  Watchlist  @relation(fields: [watchlistId], references: [id], onDelete: Cascade)
+  instrument Instrument @relation(fields: [instrumentId], references: [id], onDelete: Cascade)
+}
+
+model Holding {
+  id               String   @id @default(uuid())
+  userId           String
+  symbol           String
+  tradingSymbol    String
+  exchangeSegment  String
+  quantity         Int
+  averagePrice     Float
+  currentPrice     Float
+  investedValue    Float
+  currentValue     Float
+  unrealizedPnL    Float
+  unrealizedPnLPct Float
+  updatedAt        DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, symbol])
+}
+
+model Position {
+  id              String   @id @default(uuid())
+  userId          String
+  symbol          String
+  tradingSymbol   String
+  exchangeSegment String
+  product         String   // CNC, MIS, NRML
+  netQuantity     Int
+  buyQty          Int      @default(0)
+  buyValue        Float    @default(0.0)
+  sellQty         Int      @default(0)
+  sellValue       Float    @default(0.0)
+  averagePrice    Float
+  realizedPnL     Float    @default(0.0)
+  updatedAt       DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, symbol])
+}
+
+model Order {
+  id              String   @id @default(uuid())
+  userId          String
+  orderNumber     String   @unique
+  symbol          String
+  tradingSymbol   String
+  exchangeSegment String
+  transactionType String   // BUY, SELL
+  orderType       String   // MARKET, LIMIT, SL, SL-M
+  product         String   // CNC, MIS, NRML
+  quantity        Int
+  price           Float    @default(0.0)
+  triggerPrice    Float    @default(0.0)
+  status          String   // PENDING, OPEN, TRADED, CANCELLED, REJECTED
+  validity        String   @default("DAY")
+  mode            String   @default("LIVE") // LIVE
+  rejectionReason String?
+  orderTime       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  user   User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  trades Trade[]
+
+  @@index([userId, symbol])
+}
+
+model Trade {
+  id              String   @id @default(uuid())
+  userId          String
+  orderId         String
+  tradeId         String   @unique
+  symbol          String
+  tradingSymbol   String
+  exchangeSegment String
+  transactionType String
+  quantity        Int
+  price           Float
+  tradeTime       DateTime @default(now())
+
+  user  User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  order Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
+}
+
+model PaperOrder {
+  id              String   @id @default(uuid())
+  userId          String
+  orderNumber     String   @unique
+  symbol          String
+  tradingSymbol   String
+  exchangeSegment String
+  transactionType String   // BUY, SELL
+  orderType       String   // MARKET, LIMIT
+  product         String   // CNC, MIS
+  quantity        Int
+  price           Float
+  status          String   // OPEN, FILLED, CANCELLED
+  orderTime       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  paperTrades PaperTrade[]
+}
+
+model PaperTrade {
+  id           String   @id @default(uuid())
+  userId       String
+  paperOrderId String
+  symbol       String
+  quantity     Int
+  price        Float
+  tradeTime    DateTime @default(now())
+
+  user       User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  paperOrder PaperOrder @relation(fields: [paperOrderId], references: [id], onDelete: Cascade)
+}
+
+model Alert {
+  id          String   @id @default(uuid())
+  userId      String
+  symbol      String
+  alertType   String   // PRICE, RSI, SENTIMENT, MACD
+  targetValue Float
+  condition   String   // GREATER_THAN, LESS_THAN, CROSSES_ABOVE, CROSSES_BELOW
+  isTriggered Boolean  @default(false)
+  createdAt   DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model Backtest {
+  id            String   @id @default(uuid())
+  userId        String
+  strategyName  String
+  symbol        String
+  startDate     DateTime
+  endDate       DateTime
+  parameters    String   // JSON string of inputs
+  totalReturn   Float
+  cagr          Float
+  winRate       Float
+  maxDrawdown   Float
+  sharpeRatio   Float
+  profitFactor  Float
+  totalTrades   Int
+  tradeLogsJson String   // Detailed trades JSON string
+  createdAt     DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model AuditLog {
+  id        String   @id @default(uuid())
+  userId    String
+  action    String
+  symbol    String?
+  orderId   String?
+  mode      String
+  details   String
+  ipAddress String?
+  timestamp DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
