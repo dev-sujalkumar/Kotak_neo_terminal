@@ -1576,6 +1576,10 @@ button.w-full.text-left {
 .gradient-text {
   background: linear-gradient(135deg, #00d4ff 0%, #0088ff 30%, #00d4ff 60%, #54d6cf 100%);
   background-size: 300% auto;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  display: inline-block;
   animation: gradient-shift 4s linear infinite;
 }
 

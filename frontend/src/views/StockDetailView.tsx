@@ -1,13 +1,18 @@
-import React, { useState, useEffect } from 'react';
-import { TrendingUp, TrendingDown, RefreshCw, ShoppingCart, Sliders, Newspaper } from 'lucide-react';
+import React, { useState, useEffect, useMemo } from 'react';
+import { TrendingUp, TrendingDown, RefreshCw, ShoppingCart, Sliders, Newspaper, Building2 } from 'lucide-react';
 import { useStore } from '../store/useStore';
 import { api } from '../services/api';
 import { QuoteData, SentimentAnalysis, TechnicalIndicators, CombinedSignal, NewsArticle } from '../types';
 import { CandlestickChart } from '../components/CandlestickChart';
 import { SentimentGauge } from '../components/SentimentGauge';
 import { SignalExplanationCard } from '../components/SignalExplanationCard';
+import { resolveStock, StockInfo } from '../data/stockRegistry';
 
-const POPULAR = ['TCS', 'RELIANCE', 'INFY', 'HDFCBANK', 'ICICIBANK', 'SBIN', 'BHARTIARTL', 'ITC', 'LT', 'SUNPHARMA'];
+const POPULAR = [
+  'TATAMOTORS', 'RELIANCE', 'TCS', 'INFY', 'HDFCBANK', 'ICICIBANK',
+  'SBIN', 'BHARTIARTL', 'ZOMATO', 'MARUTI', 'SUNPHARMA', 'TITAN',
+  'TATASTEEL', 'WMT', 'AAPL', 'NVDA', 'TSLA', 'ITC'
+];
 
 const StatBox = ({ label, value, sub, color = '#8ba5c8' }: { label: string; value: string; sub?: string; color?: string }) => (
   <div className="bg-[rgba(4,8,16,0.7)] border border-[rgba(255,255,255,0.05)] rounded-xl p-3
@@ -29,6 +34,17 @@ export const StockDetailView: React.FC = () => {
   const [loading, setLoading]   = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [refreshKey, setRefreshKey] = useState(0);
+
+  // Auto-resolve any typos or aliases in selectedSymbol (e.g. TATAMOTERS -> TATAMOTORS)
+  useEffect(() => {
+    const resolved = resolveStock(selectedSymbol);
+    if (resolved && resolved.symbol !== selectedSymbol) {
+      setSelectedSymbol(resolved.symbol);
+    }
+  }, [selectedSymbol, setSelectedSymbol]);
+
+  const stockInfo = useMemo(() => resolveStock(selectedSymbol), [selectedSymbol]);
+  const currencySymbol = (quote?.currency === 'USD' || stockInfo?.currency === '$') ? '$' : '₹';
 
   useEffect(() => {
     let active = true;
@@ -100,8 +116,16 @@ export const StockDetailView: React.FC = () => {
             <div>
               <div className="flex items-center gap-3 mb-1">
                 <h1 className="text-2xl font-bold font-mono text-white">{quote.symbol}</h1>
+                {stockInfo && (
+                  <span className="text-sm font-sans font-medium text-slate-300 hidden sm:inline">
+                    {stockInfo.name}
+                  </span>
+                )}
                 <span className="badge badge-cyan text-[9px]">{quote.tradingSymbol}</span>
                 <span className="badge badge-neutral text-[9px]">{quote.exchangeSegment.toUpperCase()}</span>
+                {stockInfo && (
+                  <span className="badge badge-purple text-[9px] hidden md:inline">{stockInfo.sector}</span>
+                )}
               </div>
               <p className="text-[10px] font-mono text-[#4a6285]">
                 {quote.dataSource || 'Market data'} · {quote.marketState || 'Market status unavailable'} · Updated {new Date(quote.lastUpdated).toLocaleString('en-IN')}
@@ -112,7 +136,7 @@ export const StockDetailView: React.FC = () => {
             <div className="flex items-center gap-5">
               <div className="text-right">
                 <div className="text-3xl font-bold font-mono" style={{ color: isPositive ? '#00ff88' : '#ff3366' }}>
-                  ₹{quote.ltp.toFixed(2)}
+                  {currencySymbol}{quote.ltp.toFixed(2)}
                 </div>
                 <div className={`flex items-center justify-end gap-1.5 text-sm font-mono font-bold mt-0.5
                                 ${isPositive ? 'text-[#00ff88]' : 'text-[#ff3366]'}`}>
@@ -136,12 +160,12 @@ export const StockDetailView: React.FC = () => {
           {/* OHLCV Strip */}
           <div className="mt-4 grid grid-cols-3 sm:grid-cols-6 gap-2 border-t border-[rgba(255,255,255,0.05)] pt-3">
             {[
-              { label: 'OPEN',    value: `₹${quote.open.toFixed(2)}` },
-              { label: 'HIGH',    value: `₹${quote.high.toFixed(2)}`,  color: '#00ff88' },
-              { label: 'LOW',     value: `₹${quote.low.toFixed(2)}`,   color: '#ff3366' },
-              { label: 'CLOSE',   value: `₹${quote.close.toFixed(2)}` },
-              { label: '52W HI',  value: quote.fiftyTwoWeekHigh ? `₹${quote.fiftyTwoWeekHigh.toFixed(0)}` : '—', color: '#00ff88' },
-              { label: '52W LO',  value: quote.fiftyTwoWeekLow  ? `₹${quote.fiftyTwoWeekLow.toFixed(0)}`  : '—', color: '#ff3366' },
+              { label: 'OPEN',    value: `${currencySymbol}${quote.open.toFixed(2)}` },
+              { label: 'HIGH',    value: `${currencySymbol}${quote.high.toFixed(2)}`,  color: '#00ff88' },
+              { label: 'LOW',     value: `${currencySymbol}${quote.low.toFixed(2)}`,   color: '#ff3366' },
+              { label: 'CLOSE',   value: `${currencySymbol}${quote.close.toFixed(2)}` },
+              { label: '52W HI',  value: quote.fiftyTwoWeekHigh ? `${currencySymbol}${quote.fiftyTwoWeekHigh.toFixed(0)}` : '—', color: '#00ff88' },
+              { label: '52W LO',  value: quote.fiftyTwoWeekLow  ? `${currencySymbol}${quote.fiftyTwoWeekLow.toFixed(0)}`  : '—', color: '#ff3366' },
             ].map(s => (
               <div key={s.label} className="text-center">
                 <div className="text-[8px] font-mono text-[#2a3f5f] uppercase tracking-wider">{s.label}</div>
