@@ -92,11 +92,19 @@ export const api = {
   createWatchlist: async (name: string) => (await axios.post(`${API_BASE}/watchlists`, { name })).data,
   addToWatchlist: async (watchlistId: string, symbol: string) =>
     (await axios.post(`${API_BASE}/watchlists/${watchlistId}/items`, { symbol })).data,
+  deleteWatchlistItem: async (watchlistId: string, itemId: string) =>
+    (await axios.delete(`${API_BASE}/watchlists/${watchlistId}/items/${itemId}`)).data,
+  deleteWatchlist: async (watchlistId: string) =>
+    (await axios.delete(`${API_BASE}/watchlists/${watchlistId}`)).data,
 
   // Alerts
   getAlerts: async () => (await axios.get(`${API_BASE}/alerts`)).data,
   createAlert: async (data: { symbol: string; alertType: string; targetValue: number; condition: string }) =>
     (await axios.post(`${API_BASE}/alerts`, data)).data,
+  deleteAlert: async (alertId: string) =>
+    (await axios.delete(`${API_BASE}/alerts/${alertId}`)).data,
+  toggleAlert: async (alertId: string) =>
+    (await axios.patch(`${API_BASE}/alerts/${alertId}/toggle`)).data,
 
   // Backtesting
   runBacktest: async (params: any): Promise<BacktestResult> => (await axios.post(`${API_BASE}/backtest`, params)).data,

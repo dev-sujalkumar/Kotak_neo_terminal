@@ -14,6 +14,19 @@ describe('Stock Sentiment Engine & Technical Analysis Unit Tests', () => {
     expect(indicators.rsi14).toBeLessThanOrEqual(100);
     expect(indicators.macd.macdLine).toBeDefined();
     expect(indicators.bollingerBands.upper).toBeGreaterThan(indicators.bollingerBands.lower);
+    expect(indicators.supportLevel).toBeGreaterThan(0);
+    expect(indicators.resistanceLevel).toBeGreaterThan(0);
+    expect(['UPTREND', 'DOWNTREND', 'SIDEWAYS']).toContain(indicators.trend);
+  });
+
+  it('should calculate technical composite score based on indicator thresholds', () => {
+    const candles = TechnicalAnalysisService.generateSyntheticCandles(4000, 100);
+    const indicators = TechnicalAnalysisService.calculateIndicators('TCS', '1D', candles);
+    const score = TechnicalAnalysisService.calculateTechnicalScore(indicators, 4000);
+
+    expect(typeof score).toBe('number');
+    expect(score).toBeGreaterThanOrEqual(-100);
+    expect(score).toBeLessThanOrEqual(100);
   });
 
   it('should correctly compute Combined Signal score and explainable reasons', () => {

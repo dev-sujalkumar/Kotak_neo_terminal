@@ -865,11 +865,22 @@ app.post('/api/watchlists', authMiddleware, async (req: AuthRequest, res) => {
 app.post('/api/watchlists/:id/items', authMiddleware, async (req, res) => {
   try {
     const { symbol } = req.body;
-    const instrument = await prisma.instrument.findFirst({
-      where: { symbol: symbol.toUpperCase() }
+    if (!symbol) return res.status(400).json({ error: 'Symbol is required' });
+    const cleanSym = String(symbol).toUpperCase().replace(/\.(NS|BO)$/i, '').trim();
+    let instrument = await prisma.instrument.findFirst({
+      where: { symbol: cleanSym }
     });
     if (!instrument) {
-      return res.status(404).json({ error: `Instrument for symbol ${symbol} not found.` });
+      instrument = await prisma.instrument.create({
+        data: {
+          symbol: cleanSym,
+          tradingSymbol: `${cleanSym}-EQ`,
+          exchangeSegment: 'nse_cm',
+          name: cleanSym,
+          lotSize: 1,
+          instrumentToken: `TOK_${cleanSym}_${Date.now()}`,
+        }
+      });
     }
 
     const item = await prisma.watchlistItem.create({
@@ -880,6 +891,27 @@ app.post('/api/watchlists/:id/items', authMiddleware, async (req, res) => {
       include: { instrument: true }
     });
     res.json(item);
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.delete('/api/watchlists/:watchlistId/items/:itemId', authMiddleware, async (req, res) => {
+  try {
+    await prisma.watchlistItem.delete({
+      where: { id: req.params.itemId }
+    });
+    res.json({ success: true, message: 'Watchlist item deleted.' });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.delete('/api/watchlists/:id', authMiddleware, async (req, res) => {
+  try {
+    await prisma.watchlistItem.deleteMany({ where: { watchlistId: req.params.id } });
+    await prisma.watchlist.delete({ where: { id: req.params.id } });
+    res.json({ success: true, message: 'Watchlist deleted.' });
   } catch (err: any) {
     res.status(500).json({ error: err.message });
   }
@@ -922,6 +954,29 @@ app.post('/api/alerts', authMiddleware, async (req: AuthRequest, res) => {
     });
 
     res.json(alert);
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.delete('/api/alerts/:id', authMiddleware, async (req, res) => {
+  try {
+    await prisma.alert.delete({ where: { id: req.params.id } });
+    res.json({ success: true, message: 'Alert deleted.' });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.patch('/api/alerts/:id/toggle', authMiddleware, async (req, res) => {
+  try {
+    const alert = await prisma.alert.findUnique({ where: { id: req.params.id } });
+    if (!alert) return res.status(404).json({ error: 'Alert not found.' });
+    const updated = await prisma.alert.update({
+      where: { id: req.params.id },
+      data: { isTriggered: !alert.isTriggered }
+    });
+    res.json(updated);
   } catch (err: any) {
     res.status(500).json({ error: err.message });
   }

@@ -1,4 +1,4 @@
-﻿import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { AlertTriangle, ArrowRight, BarChart2, Check, Copy, Globe, RefreshCw, Search, Sparkles, Zap } from 'lucide-react';
 import { useStore } from '../store/useStore';
 import { api } from '../services/api';
@@ -100,9 +100,36 @@ export const CustomNewsView: React.FC = () => {
         </div>
 
         <div className="mt-5 space-y-4">
-          <div className="flex items-center gap-2 text-xs font-mono text-slate-400">
-            <Search className="w-3.5 h-3.5" />
-            Paste company or market news text and analyze it instantly.
+          <div className="flex flex-wrap items-center justify-between gap-2 text-xs font-mono text-slate-400">
+            <div className="flex items-center gap-2">
+              <Search className="w-3.5 h-3.5 text-cyan-400" />
+              <span>Paste company or market news text to analyze with FinBERT:</span>
+            </div>
+            <div className="flex items-center gap-1.5">
+              <span className="text-[10px] text-slate-500">Test Samples:</span>
+              <button
+                type="button"
+                onClick={() => {
+                  setInputText('Tata Consultancy Services reported a 14.5% YoY rise in consolidated net profit to ₹12,434 crore, with strong order book expansion across North America and BFSI verticals.');
+                  setSelectedTicker('TCS.NS');
+                  setSelectedCompany('Tata Consultancy Services');
+                }}
+                className="text-[10px] px-2 py-0.5 rounded bg-emerald-950/40 border border-emerald-500/30 text-emerald-300 hover:text-white"
+              >
+                Earnings Beat (Bullish)
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setInputText('Regulatory authorities imposed penalties and warned of compliance lapses, triggering valuation worries and sharp margin compression across the division.');
+                  setSelectedTicker('');
+                  setSelectedCompany('');
+                }}
+                className="text-[10px] px-2 py-0.5 rounded bg-rose-950/40 border border-rose-500/30 text-rose-300 hover:text-white"
+              >
+                Regulatory Drag (Bearish)
+              </button>
+            </div>
           </div>
 
           <textarea
