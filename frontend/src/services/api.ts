@@ -49,10 +49,6 @@ export const api = {
   getSentiment: async (symbol: string): Promise<SentimentAnalysis> =>
     (await axios.get(`${API_BASE}/sentiment/${symbol}`)).data,
   getNews: async (symbol: string): Promise<NewsArticle[]> => (await axios.get(`${API_BASE}/news/${symbol}`)).data,
-  getCorrelation: async (symbol: string): Promise<any> =>
-    (await axios.get(`${API_BASE}/sentiment/${symbol}/correlation`)).data,
-  getPrediction: async (symbol: string): Promise<any> =>
-    (await axios.get(`${API_BASE}/sentiment/${symbol}/prediction`)).data,
   analyzeCustomNews: async (payload: CustomNewsAnalysisRequest): Promise<CustomNewsAnalysisResult> =>
     (await axios.post(`${API_BASE}/sentiment/custom-analyze`, payload)).data,
 

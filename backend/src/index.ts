@@ -487,32 +487,6 @@ app.get('/api/news/:symbol', authMiddleware, async (req, res) => {
   }
 });
 
-app.get('/api/sentiment/:symbol/correlation', authMiddleware, async (req, res) => {
-  try {
-    const correlation = await sentimentService.getSentimentCorrelation(req.params.symbol);
-    res.json(correlation);
-  } catch (err: any) {
-    logger.warn('Sentiment correlation calculation failed', {
-      symbol: req.params.symbol,
-      message: err instanceof Error ? err.message : 'Unknown correlation error',
-    });
-    res.status(502).json({ error: err.message || 'Unable to calculate sentiment correlation.' });
-  }
-});
-
-app.get('/api/sentiment/:symbol/prediction', authMiddleware, async (req, res) => {
-  try {
-    const prediction = await sentimentService.getMarketPrediction(req.params.symbol);
-    res.json(prediction);
-  } catch (err: any) {
-    logger.warn('ML market prediction failed', {
-      symbol: req.params.symbol,
-      message: err instanceof Error ? err.message : 'Unknown prediction error',
-    });
-    res.status(502).json({ error: err.message || 'Unable to generate market prediction.' });
-  }
-});
-
 app.post('/api/sentiment/custom-analyze', authMiddleware, async (req, res) => {
   try {
     const { text, selectedCompany, selectedTicker } = req.body || {};

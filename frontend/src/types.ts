@@ -205,43 +205,6 @@ export interface BacktestResult {
   equityCurve?: number[];
 }
 
-export interface CorrelationAnalytics {
-  symbol: string;
-  pearsonCorrelation: number;
-  sentimentPriceDirectionMatchPct: number;
-  rollingCorrelation: Array<{ date: string; rollingCorrelation: number }>;
-  sentimentVsReturns: Array<{ date: string; sentimentScore: number; returnPct: number; aligned: boolean }>;
-  leadLagAnalysis: {
-    optimalLagDays: number;
-    sameDayCorrelation: number;
-    nextDayLeadCorrelation: number;
-    leadStatus: string;
-  };
-  interpretation: string;
-}
-
-export interface ModelComparisonResult {
-  modelName: string;
-  accuracy: number;
-  precision: number;
-  recall: number;
-  f1Score: number;
-  predictedDirection: string;
-  upProbability: number;
-}
-
-export interface DirectionalPredictionResult {
-  symbol: string;
-  predictedDirection: 'UP' | 'DOWN';
-  predictionProbability: number;
-  confidence: number;
-  primaryModel: string;
-  models: ModelComparisonResult[];
-  featureImportance: Record<string, number>;
-  aiInsight: string;
-  disclaimer: string;
-}
-
 export interface CustomNewsAnalysisRequest {
   text: string;
   selectedCompany?: string;
