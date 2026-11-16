@@ -56,6 +56,7 @@ export const PortfolioView: React.FC = () => {
       setFundsUpdatedAt(new Date());
     } catch (err: any) {
       console.error('Account funds refresh failed:', err);
+      if (err.response?.status === 503) setKotakConnected(false);
       setLimits(null);
       setFundsError(err.response?.data?.error || 'Unable to retrieve live funds from Kotak Neo.');
     } finally {

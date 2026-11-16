@@ -33,6 +33,7 @@ export const KotakSetupView: React.FC = () => {
       setTotp('');
       setSuccessMsg('Kotak Neo connected. Trading remains in paper mode until you explicitly switch to live.');
     } catch (err: any) {
+      setKotakConnected(false);
       setErrorMsg(err.response?.data?.error || err.message);
     } finally {
       setLoading(false);
@@ -79,6 +80,7 @@ export const KotakSetupView: React.FC = () => {
       setKotakConnected(true);
       setSuccessMsg('Kotak Neo connected. Trading remains in paper mode until you explicitly switch to live.');
     } catch (err: any) {
+      setKotakConnected(false);
       setErrorMsg(err.response?.data?.error || err.message);
     } finally {
       setLoading(false);

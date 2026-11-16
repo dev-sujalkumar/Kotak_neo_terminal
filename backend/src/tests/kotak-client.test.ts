@@ -68,6 +68,17 @@ describe('Kotak Neo client', () => {
     await expect(service.getLimits()).rejects.toThrow('without a valid net balance');
   });
 
+  it('clears a stale session when Kotak rejects MPIN validation', async () => {
+    const service = new KotakNeoBrokerService();
+    service.setSession('https://api.kotaksecurities.com', 'old-session', 'old-sid');
+    mockedAxios.post.mockRejectedValueOnce({ response: { status: 401 } });
+
+    await expect(service.validateMpin('123456', 'view-token', 'view-sid'))
+      .rejects.toThrow('Kotak Neo rejected MPIN validation');
+
+    expect(service.isConnected()).toBe(false);
+  });
+
   it('maps Kotak documented holding fields to the portfolio model', async () => {
     mockedAxios.get.mockResolvedValueOnce({
       data: {

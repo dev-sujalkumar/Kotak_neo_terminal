@@ -236,6 +236,7 @@ export class KotakNeoBrokerService implements IBrokerService {
         return result;
       } catch (error: any) {
         logger.error('Kotak Neo MPIN validation failed', { status: error.response?.status });
+        this.clearSession();
         throw new Error('Kotak Neo rejected MPIN validation. Verify the configured broker credentials and try again.');
       }
     });
