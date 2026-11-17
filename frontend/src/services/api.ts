@@ -15,6 +15,7 @@ import {
   KotakScripSearchParams,
   CustomNewsAnalysisRequest,
   CustomNewsAnalysisResult,
+  ExtractedPdfDocument,
 } from '../types';
 
 const API_BASE = '/api';
@@ -37,25 +38,33 @@ export const api = {
     (await axios.get(`${API_BASE}/broker/kotak/scrip-search`, { params })).data,
   getKotakQuotes: async (instruments: KotakQuoteInstrument[], quoteType: string = 'all') =>
     (await axios.post(`${API_BASE}/broker/kotak/quotes`, { instruments, quoteType })).data,
+  getKotakQuote: async (symbol: string, segment: string = 'nse_cm', filter: string = 'all'): Promise<QuoteData> =>
+    (await axios.get(`${API_BASE}/broker/kotak/quote/${symbol}?segment=${segment}&filter=${filter}`)).data,
+  checkKotakMargin: async (orderParams: any) =>
+    (await axios.post(`${API_BASE}/broker/kotak/check-margin`, orderParams)).data,
+  syncPortfolio: async () => (await axios.post(`${API_BASE}/portfolio/sync`)).data,
+  getPortfolioSyncStatus: async () => (await axios.get(`${API_BASE}/portfolio/sync-status`)).data,
 
   // Market Data
   getInstruments: async () => (await axios.get(`${API_BASE}/market/instruments`)).data,
   getQuote: async (symbol: string, exchange: string = 'nse_cm'): Promise<QuoteData> =>
-    (await axios.get(`${API_BASE}/market/quote/${symbol}?exchange=${exchange}`)).data,
-  getCandles: async (symbol: string): Promise<any[]> => (await axios.get(`${API_BASE}/market/candles/${symbol}`)).data,
+    (await axios.get(`${API_BASE}/market/quote/${encodeURIComponent(symbol)}?exchange=${exchange}`)).data,
+  getCandles: async (symbol: string): Promise<any[]> => (await axios.get(`${API_BASE}/market/candles/${encodeURIComponent(symbol)}`)).data,
   getIndices: async () => (await axios.get(`${API_BASE}/market/indices`)).data,
 
   // Sentiment & News
   getSentiment: async (symbol: string): Promise<SentimentAnalysis> =>
-    (await axios.get(`${API_BASE}/sentiment/${symbol}`)).data,
-  getNews: async (symbol: string): Promise<NewsArticle[]> => (await axios.get(`${API_BASE}/news/${symbol}`)).data,
+    (await axios.get(`${API_BASE}/sentiment/${encodeURIComponent(symbol)}`)).data,
+  getNews: async (symbol: string): Promise<NewsArticle[]> => (await axios.get(`${API_BASE}/news/${encodeURIComponent(symbol)}`)).data,
   analyzeCustomNews: async (payload: CustomNewsAnalysisRequest): Promise<CustomNewsAnalysisResult> =>
     (await axios.post(`${API_BASE}/sentiment/custom-analyze`, payload)).data,
+  extractPdfText: async (payload: { base64Data?: string; fileName?: string; textContent?: string }): Promise<ExtractedPdfDocument> =>
+    (await axios.post(`${API_BASE}/sentiment/extract-pdf`, payload)).data,
 
   // Technical & Signals
   getTechnical: async (symbol: string, period: string = '1D'): Promise<TechnicalIndicators> =>
-    (await axios.get(`${API_BASE}/technical/${symbol}?period=${period}`)).data,
-  getSignal: async (symbol: string): Promise<CombinedSignal> => (await axios.get(`${API_BASE}/signal/${symbol}`)).data,
+    (await axios.get(`${API_BASE}/technical/${encodeURIComponent(symbol)}?period=${period}`)).data,
+  getSignal: async (symbol: string): Promise<CombinedSignal> => (await axios.get(`${API_BASE}/signal/${encodeURIComponent(symbol)}`)).data,
 
   // Portfolio
   getHoldings: async (): Promise<HoldingItem[]> => (await axios.get(`${API_BASE}/portfolio/holdings`)).data,
@@ -77,6 +86,13 @@ export const api = {
   connectKotakOrderFeed: (onMessage: (message: MessageEvent<string>) => void, onError: (event: Event) => void) => {
     const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
     const socket = new WebSocket(`${protocol}//${window.location.host}/api/broker/kotak/order-feed`);
+    socket.addEventListener('message', onMessage);
+    socket.addEventListener('error', onError);
+    return socket;
+  },
+  connectKotakMarketFeed: (onMessage: (message: MessageEvent<string>) => void, onError: (event: Event) => void) => {
+    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+    const socket = new WebSocket(`${protocol}//${window.location.host}/api/broker/kotak/market-feed`);
     socket.addEventListener('message', onMessage);
     socket.addEventListener('error', onError);
     return socket;

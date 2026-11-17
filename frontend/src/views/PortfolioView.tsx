@@ -151,10 +151,29 @@ export const PortfolioView: React.FC = () => {
             {isLivePortfolio ? 'Your broker-reported Demat holdings and account activity.' : 'Your simulated holdings, positions, and account funds.'}
           </p>
         </div>
-        <button type="button" onClick={() => void refreshAll()} disabled={loading || fundsLoading} className="btn-ghost flex items-center gap-2 px-4 py-2.5 relative disabled:cursor-not-allowed disabled:opacity-60">
-          <RefreshCw className={`h-4 w-4 ${loading || fundsLoading ? 'animate-spin' : ''}`} />
-          <span className="text-[10px] font-semibold tracking-wider">{loading || fundsLoading ? 'UPDATING' : 'REFRESH ALL'}</span>
-        </button>
+        <div className="flex items-center gap-2">
+          {isKotakConnected && (
+            <button
+              type="button"
+              onClick={async () => {
+                try {
+                  const res = await api.syncPortfolio();
+                  await refreshAll();
+                } catch (e: any) {
+                  console.error('Portfolio sync failed', e);
+                }
+              }}
+              className="flex items-center gap-1.5 rounded-lg border border-cyan-500/30 bg-cyan-500/10 px-3 py-2 text-[10px] font-bold text-cyan-300 hover:bg-cyan-500/20"
+            >
+              <RefreshCw className="h-3.5 w-3.5" />
+              <span>SYNC DEMAT</span>
+            </button>
+          )}
+          <button type="button" onClick={() => void refreshAll()} disabled={loading || fundsLoading} className="btn-ghost flex items-center gap-2 px-4 py-2.5 relative disabled:cursor-not-allowed disabled:opacity-60">
+            <RefreshCw className={`h-4 w-4 ${loading || fundsLoading ? 'animate-spin' : ''}`} />
+            <span className="text-[10px] font-semibold tracking-wider">{loading || fundsLoading ? 'UPDATING' : 'REFRESH ALL'}</span>
+          </button>
+        </div>
       </div>
 
       <section className="glass-panel inner-glow p-5 sm:p-6 space-y-4" aria-label="Kotak Neo account funds">
@@ -355,7 +374,7 @@ export const PortfolioView: React.FC = () => {
             <table className="data-table">
               <thead>
                 <tr>
-                  {['Symbol', 'Qty', 'Avg Price', 'LTP', 'Invested', 'Curr Value', 'P&L', '% Return'].map(h => (
+                  {['Symbol', 'Total Qty', 'Sellable', 'Avg Price', 'LTP', 'Invested', 'Curr Value', 'P&L', '% Return'].map(h => (
                     <th key={h}>{h}</th>
                   ))}
                 </tr>
@@ -376,11 +395,15 @@ export const PortfolioView: React.FC = () => {
                         </div>
                         <div>
                           <div className="font-bold text-white text-[11px] hover:text-[#00d4ff] transition-colors">{h.symbol}</div>
-                          <div className="text-[9px] text-[#4a6285]">{h.tradingSymbol} · {h.exchangeSegment.replace('_', ' ').toUpperCase()}</div>
+                          <div className="text-[9px] text-[#4a6285]">
+                            {h.tradingSymbol} · {h.exchangeSegment.replace('_', ' ').toUpperCase()}
+                            {h.sector && ` · ${h.sector}`}
+                          </div>
                         </div>
                       </div>
                     </td>
                     <td className="text-[#8ba5c8] font-bold">{h.quantity}</td>
+                    <td className="text-cyan-400 font-semibold">{h.sellableQuantity !== undefined ? h.sellableQuantity : h.quantity}</td>
                     <td className="text-[#8ba5c8]">₹{h.averagePrice.toFixed(2)}</td>
                     <td className="text-white font-bold">₹{h.currentPrice.toFixed(2)}</td>
                     <td className="text-[#8ba5c8]">₹{fmt(h.investedValue)}</td>

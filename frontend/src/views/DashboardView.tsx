@@ -19,7 +19,8 @@ const SkeletonCard = () => (
 );
 
 export const DashboardView: React.FC = () => {
-  const { setSelectedSymbol, setActiveTab, openOrderModal, isKotakConnected } = useStore();
+  const { selectedSymbol, setSelectedSymbol, setActiveTab, openOrderModal, isKotakConnected, setCustomNewsDraft } = useStore();
+  const activeSym = selectedSymbol || 'TCS';
 
   const [topStocks, setTopStocks] = useState<any[]>([]);
   const [news, setNews] = useState<NewsArticle[]>([]);
@@ -41,9 +42,9 @@ export const DashboardView: React.FC = () => {
     setTopStocks(quotes);
 
     const [sentimentResult, signalResult, newsResult] = await Promise.allSettled([
-      api.getSentiment('TCS'),
-      api.getSignal('TCS'),
-      api.getNews('TCS'),
+      api.getSentiment(activeSym),
+      api.getSignal(activeSym),
+      api.getNews(activeSym),
     ]);
     if (sentimentResult.status === 'fulfilled') setSentiment(sentimentResult.value);
     if (signalResult.status === 'fulfilled') setSignal(signalResult.value);
@@ -61,7 +62,7 @@ export const DashboardView: React.FC = () => {
     setLoading(false);
   };
 
-  useEffect(() => { load(); }, [refreshKey]);
+  useEffect(() => { load(); }, [activeSym, refreshKey]);
 
   const quickActions = [
     {
@@ -296,16 +297,33 @@ export const DashboardView: React.FC = () => {
                     {item.description && (
                       <p className="text-[11px] text-slate-400 mt-1 line-clamp-1">{item.description}</p>
                     )}
-                    {item.sentiment && (
-                      <div className="mt-1.5">
-                        <span className={`text-[8px] font-mono font-bold px-1.5 py-0.5 rounded-md
+                    <div className="mt-2 flex items-center justify-between gap-2">
+                      {item.sentiment && (
+                        <span className={`text-[8px] font-mono font-bold px-2 py-0.5 rounded-md
                           ${item.sentiment === 'POSITIVE' ? 'badge badge-positive' :
                             item.sentiment === 'NEGATIVE' ? 'badge badge-negative' : 'badge badge-neutral'}`}>
                           {item.sentiment}
                           {item.score != null ? ` · ${item.score > 0 ? '+' : ''}${item.score.toFixed(2)}` : ''}
                         </span>
-                      </div>
-                    )}
+                      )}
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          setCustomNewsDraft({
+                            text: `${item.title}\n\n${item.description || ''}`.trim(),
+                            company: '',
+                            ticker: activeSym,
+                            autoAnalyze: true,
+                          });
+                          setActiveTab('custom-news');
+                        }}
+                        className="text-[9px] font-mono font-semibold px-2 py-0.5 rounded border border-purple-500/30 bg-purple-950/40 text-purple-300 hover:text-white transition-colors"
+                      >
+                        ⚡ Analyse NLP
+                      </button>
+                    </div>
                   </a>
                 ))}
           </div>

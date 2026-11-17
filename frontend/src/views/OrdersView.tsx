@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { BookOpenCheck, History, Wifi, WifiOff } from 'lucide-react';
+import { BookOpenCheck, History, Wifi, WifiOff, Eye, X, AlertCircle } from 'lucide-react';
 import { api } from '../services/api';
 import { OrderItem, TradeItem } from '../types';
 import { useStore } from '../store/useStore';
@@ -14,6 +14,11 @@ export const OrdersView: React.FC = () => {
   const [lastFeedMessage, setLastFeedMessage] = useState<string | null>(null);
   const [feedUpdatedAt, setFeedUpdatedAt] = useState<Date | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
+
+  // Order History Inspection Modal State
+  const [selectedOrderHistory, setSelectedOrderHistory] = useState<OrderItem[] | null>(null);
+  const [historyOrderNumber, setHistoryOrderNumber] = useState<string | null>(null);
+  const [historyLoading, setHistoryLoading] = useState(false);
 
   const loadData = async () => {
     setLoading(true);
@@ -48,15 +53,30 @@ export const OrdersView: React.FC = () => {
     return () => socket.close();
   }, [isKotakConnected, tradingMode]);
 
+  const viewOrderHistory = async (orderNumber: string) => {
+    setHistoryOrderNumber(orderNumber);
+    setSelectedOrderHistory(null);
+    setHistoryLoading(true);
+    try {
+      const history = await api.getOrderHistory(orderNumber);
+      setSelectedOrderHistory(history);
+    } catch (err: any) {
+      setActionError(err.response?.data?.error || err.message || 'Unable to retrieve order history.');
+    } finally {
+      setHistoryLoading(false);
+    }
+  };
+
   const cancelOrder = async (order: OrderItem) => {
     const orderClass = order.product === 'CO' ? 'COVER' : order.product === 'BO' ? 'BRACKET' : 'REGULAR';
-    if (!window.confirm(`Cancel ${order.transactionType} ${order.quantity} ${order.tradingSymbol} order ${order.orderNumber}?`)) return;
+    if (!window.confirm(`Cancel ${order.transactionType} ${order.quantity} ${order.tradingSymbol} order ${order.orderNumber} (${orderClass})?`)) return;
     setActionError(null);
     try {
       await api.cancelLiveOrder(order.orderNumber, {
         orderClass,
         verifyStatus: true,
         amo: order.isAmo,
+        tradingSymbol: order.tradingSymbol,
       }, true);
       await loadData();
     } catch (err: any) {
@@ -79,7 +99,7 @@ export const OrdersView: React.FC = () => {
       setActionError('Enter a valid positive order price.');
       return;
     }
-    if (!window.confirm(`Modify live order ${order.orderNumber} to ${quantity} × ${order.tradingSymbol}?`)) return;
+    if (!window.confirm(`Modify live order ${order.orderNumber} to ${quantity} × ${order.tradingSymbol} @ ₹${price || 'MKT'}?`)) return;
     setActionError(null);
     try {
       await api.modifyLiveOrder(order.orderNumber, {
@@ -102,16 +122,24 @@ export const OrdersView: React.FC = () => {
   const canManageLiveOrders = isKotakConnected && tradingMode === 'LIVE';
 
   return (
-    <div className="space-y-6 font-mono">
+    <div className="space-y-6 font-mono text-xs">
       {actionError && (
-        <div role="alert" className="rounded-lg border border-rose-500/30 bg-rose-950/30 p-3 text-xs text-rose-200">
-          {actionError}
+        <div role="alert" className="rounded-lg border border-rose-500/30 bg-rose-950/30 p-3 text-xs text-rose-200 flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <AlertCircle className="w-4 h-4 text-rose-400" />
+            <span>{actionError}</span>
+          </div>
+          <button onClick={() => setActionError(null)} className="text-gray-400 hover:text-white">
+            <X className="w-4 h-4" />
+          </button>
         </div>
       )}
+
+      {/* Live Order Feed Status */}
       <section aria-label="Live Kotak order feed" className="rounded-xl border border-cyan-500/20 bg-slate-900/70 p-4">
         <div className="flex items-center gap-2 text-xs font-semibold text-slate-200">
           {feedStatus === 'Connected' ? <Wifi className="h-4 w-4 text-emerald-400" /> : <WifiOff className="h-4 w-4 text-slate-500" />}
-          Kotak order feed
+          <span>Kotak Neo Order Feed (HSI WebSocket)</span>
           <span className={`ml-auto ${feedStatus === 'Connected' ? 'text-emerald-300' : 'text-slate-400'}`}>{feedStatus}</span>
         </div>
         {lastFeedMessage && (
@@ -163,13 +191,14 @@ export const OrdersView: React.FC = () => {
                   <th className="py-2.5 px-3">Qty</th>
                   <th className="py-2.5 px-3">Price</th>
                   <th className="py-2.5 px-3">Status</th>
+                  <th className="py-2.5 px-3">History</th>
                   {canManageLiveOrders && <th className="py-2.5 px-3">Actions</th>}
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-800/60">
                 {orders.map((ord, i) => (
                   <tr key={i} className="hover:bg-gray-800/40 transition-colors">
-                    <td className="py-3 px-3 font-mono text-cyan-400 text-[11px]">{ord.orderNumber}</td>
+                    <td className="py-3 px-3 font-mono text-cyan-400 text-[11px] font-semibold">{ord.orderNumber}</td>
                     <td className="py-3 px-3 text-gray-400">{ord.orderTime ? new Date(ord.orderTime).toLocaleTimeString() : '—'}</td>
                     <td className="py-3 px-3 font-bold text-white">{ord.symbol}</td>
                     <td className={`py-3 px-3 font-bold ${ord.transactionType === 'BUY' ? 'text-emerald-400' : 'text-rose-400'}`}>
@@ -182,6 +211,19 @@ export const OrdersView: React.FC = () => {
                       <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-950 text-emerald-400 border border-emerald-600/40">
                         {ord.status}
                       </span>
+                    </td>
+                    <td className="py-3 px-3">
+                      {canManageLiveOrders ? (
+                        <button
+                          onClick={() => viewOrderHistory(ord.orderNumber)}
+                          className="flex items-center gap-1 text-[10px] text-cyan-400 hover:text-cyan-200 px-2 py-1 rounded bg-gray-950 border border-gray-800"
+                        >
+                          <Eye className="w-3 h-3" />
+                          <span>Timeline</span>
+                        </button>
+                      ) : (
+                        <span className="text-gray-500">—</span>
+                      )}
                     </td>
                     {canManageLiveOrders && (
                       <td className="py-3 px-3">
@@ -240,6 +282,51 @@ export const OrdersView: React.FC = () => {
                 ))}
               </tbody>
             </table>
+          </div>
+        </div>
+      )}
+
+      {/* Order History Timeline Modal */}
+      {historyOrderNumber && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
+          <div className="glass-panel w-full max-w-xl rounded-2xl p-6 border border-gray-700 bg-gray-900 space-y-4 shadow-2xl">
+            <div className="flex items-center justify-between border-b border-gray-800 pb-3">
+              <div>
+                <h3 className="text-sm font-bold text-white">Order Status Lifecycle</h3>
+                <p className="text-[11px] text-cyan-400 font-mono">Order #{historyOrderNumber}</p>
+              </div>
+              <button
+                onClick={() => setHistoryOrderNumber(null)}
+                className="text-gray-400 hover:text-white p-1 rounded-lg hover:bg-gray-800"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {historyLoading ? (
+              <div className="py-8 text-center text-cyan-300">Loading order lifecycle events…</div>
+            ) : !selectedOrderHistory || selectedOrderHistory.length === 0 ? (
+              <div className="py-6 text-center text-gray-400">No status transitions recorded yet.</div>
+            ) : (
+              <div className="space-y-3 max-h-80 overflow-y-auto pr-1">
+                {selectedOrderHistory.map((item, idx) => (
+                  <div key={idx} className="bg-gray-950 p-3 rounded-lg border border-gray-800 space-y-1">
+                    <div className="flex justify-between items-center text-xs">
+                      <span className="font-bold text-white uppercase">{item.status}</span>
+                      <span className="text-[10px] text-gray-400">{item.orderTime}</span>
+                    </div>
+                    <div className="text-[11px] text-gray-300">
+                      {item.transactionType} {item.quantity} × {item.tradingSymbol} @ ₹{item.price || item.averagePrice || 0}
+                    </div>
+                    {item.rejectionReason && (
+                      <div className="text-[11px] text-rose-400 font-medium">
+                        Reason: {item.rejectionReason}
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         </div>
       )}

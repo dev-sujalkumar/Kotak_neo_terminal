@@ -8,46 +8,46 @@
    DESIGN TOKENS — NEO TERMINAL PREMIUM SYSTEM
    ============================================================ */
 :root {
-  --bg-void: #020408;
-  --bg-deep: #040810;
-  --bg-base: #060c18;
-  --bg-surface: #0a1628;
-  --bg-elevated: #0e1f3a;
-  --bg-card: rgba(10, 22, 40, 0.85);
-  --bg-glass: rgba(14, 31, 58, 0.7);
+  --bg-void: #04060A;
+  --bg-deep: #060910;
+  --bg-base: #090E18;
+  --bg-surface: #0E1524;
+  --bg-elevated: #141D30;
+  --bg-card: rgba(14, 21, 36, 0.88);
+  --bg-glass: rgba(14, 22, 38, 0.75);
 
-  --cyan-primary: #00d4ff;
-  --cyan-glow: rgba(0, 212, 255, 0.15);
-  --cyan-border: rgba(0, 212, 255, 0.2);
-  --blue-electric: #0066ff;
-  --blue-neon: rgba(0, 102, 255, 0.2);
+  --cyan-primary: #00E5FF;
+  --cyan-glow: rgba(0, 229, 255, 0.22);
+  --cyan-border: rgba(0, 229, 255, 0.28);
+  --blue-electric: #0070F3;
+  --blue-neon: rgba(0, 112, 243, 0.25);
 
-  --green-bull: #00ff88;
-  --green-soft: #10b981;
-  --green-glow: rgba(0, 255, 136, 0.15);
+  --green-bull: #00F59B;
+  --green-soft: #10B981;
+  --green-glow: rgba(0, 245, 155, 0.25);
 
-  --red-bear: #ff3366;
-  --red-soft: #ef4444;
-  --red-glow: rgba(255, 51, 102, 0.15);
+  --red-bear: #FF3366;
+  --red-soft: #F43F5E;
+  --red-glow: rgba(255, 51, 102, 0.25);
 
-  --amber-warn: #f59e0b;
-  --purple-ai: #a855f7;
-  --purple-glow: rgba(168, 85, 247, 0.15);
+  --amber-warn: #FFB800;
+  --purple-ai: #A855F7;
+  --purple-glow: rgba(168, 85, 247, 0.22);
 
-  --text-primary: #f0f6ff;
-  --text-secondary: #8ba5c8;
-  --text-muted: #4a6285;
-  --text-dim: #2a3f5f;
+  --text-primary: #FFFFFF;
+  --text-secondary: #94A3B8;
+  --text-muted: #64748B;
+  --text-dim: #334155;
 
-  --border-primary: rgba(0, 212, 255, 0.18);
-  --border-subtle: rgba(255, 255, 255, 0.05);
-  --border-glow: rgba(0, 212, 255, 0.4);
+  --border-primary: rgba(0, 229, 255, 0.22);
+  --border-subtle: rgba(255, 255, 255, 0.08);
+  --border-glow: rgba(0, 229, 255, 0.45);
 
-  --shadow-card: 0 4px 24px rgba(0, 0, 0, 0.6), 0 0 0 1px rgba(0, 212, 255, 0.08);
-  --shadow-glow-cyan: 0 0 30px rgba(0, 212, 255, 0.2), 0 0 60px rgba(0, 212, 255, 0.08);
-  --shadow-glow-green: 0 0 30px rgba(0, 255, 136, 0.2), 0 0 60px rgba(0, 255, 136, 0.08);
-  --shadow-glow-red: 0 0 30px rgba(255, 51, 102, 0.2), 0 0 60px rgba(255, 51, 102, 0.08);
-  --shadow-glow-purple: 0 0 30px rgba(168, 85, 247, 0.2), 0 0 60px rgba(168, 85, 247, 0.08);
+  --shadow-card: 0 16px 40px -8px rgba(0, 0, 0, 0.6), 0 0 0 1px rgba(255, 255, 255, 0.08);
+  --shadow-glow-cyan: 0 0 30px rgba(0, 229, 255, 0.25), 0 0 60px rgba(0, 229, 255, 0.1);
+  --shadow-glow-green: 0 0 30px rgba(0, 245, 155, 0.25), 0 0 60px rgba(0, 245, 155, 0.1);
+  --shadow-glow-red: 0 0 30px rgba(255, 51, 102, 0.25), 0 0 60px rgba(255, 51, 102, 0.1);
+  --shadow-glow-purple: 0 0 30px rgba(168, 85, 247, 0.25), 0 0 60px rgba(168, 85, 247, 0.1);
 }
 
 /* ============================================================
@@ -65,19 +65,20 @@
   }
 
   body {
-    background: #080d14;
+    background: #04060A;
     background-image:
-      radial-gradient(ellipse at 12% 0%, rgba(0, 102, 255, 0.09) 0%, transparent 38%),
-      radial-gradient(ellipse at 90% 22%, rgba(0, 212, 255, 0.045) 0%, transparent 32%),
-      linear-gradient(180deg, #080d14 0%, #0b111b 100%);
+      radial-gradient(circle at 8% 0%, rgba(0, 229, 255, 0.07) 0%, transparent 40%),
+      radial-gradient(circle at 92% 12%, rgba(168, 85, 247, 0.06) 0%, transparent 42%),
+      radial-gradient(circle at 50% 100%, rgba(0, 245, 155, 0.04) 0%, transparent 50%),
+      linear-gradient(180deg, #04060A 0%, #080C14 100%);
     color: var(--text-primary);
-    font-family: 'Inter', 'Space Grotesk', sans-serif;
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
     min-height: 100vh;
     overflow-x: hidden;
   }
 
   ::selection {
-    background: rgba(0, 212, 255, 0.25);
+    background: rgba(0, 229, 255, 0.3);
     color: #fff;
   }
 }
@@ -122,19 +123,25 @@
 }
 
 .glass-panel {
-  background: linear-gradient(145deg, rgba(17, 27, 41, 0.96), rgba(13, 21, 33, 0.96));
-  backdrop-filter: blur(18px);
-  border: 1px solid rgba(148, 163, 184, 0.13);
-  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.2), inset 0 1px 0 rgba(255, 255, 255, 0.025);
-  border-radius: 18px;
+  background: linear-gradient(145deg, rgba(13, 20, 34, 0.88) 0%, rgba(8, 12, 22, 0.94) 100%) !important;
+  backdrop-filter: blur(24px) saturate(180%) !important;
+  border: 1px solid rgba(255, 255, 255, 0.08) !important;
+  box-shadow: 0 16px 40px -8px rgba(0, 0, 0, 0.6), inset 0 1px 0 rgba(255, 255, 255, 0.08) !important;
+  border-radius: 16px !important;
+  transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1) !important;
+}
+
+.glass-panel:hover {
+  border-color: rgba(0, 229, 255, 0.22) !important;
+  box-shadow: 0 20px 48px -8px rgba(0, 0, 0, 0.7), 0 0 25px rgba(0, 229, 255, 0.06), inset 0 1px 0 rgba(255, 255, 255, 0.12) !important;
 }
 
 .glass-panel-sm {
-  background: rgba(17, 27, 41, 0.94);
-  backdrop-filter: blur(16px);
-  border: 1px solid rgba(148, 163, 184, 0.13);
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.18);
-  border-radius: 14px;
+  background: linear-gradient(145deg, rgba(13, 20, 34, 0.82) 0%, rgba(8, 12, 22, 0.88) 100%) !important;
+  backdrop-filter: blur(20px) saturate(180%) !important;
+  border: 1px solid rgba(255, 255, 255, 0.07) !important;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.06) !important;
+  border-radius: 12px !important;
 }
 
 /* Inner glow container */
@@ -221,74 +228,79 @@
    BUTTON SYSTEM
    ============================================================ */
 .btn-primary {
-  background: linear-gradient(135deg, #0066ff, #0044cc);
-  border: 1px solid rgba(0, 102, 255, 0.5);
-  color: #fff;
+  background: linear-gradient(135deg, #00E5FF 0%, #7C3AED 100%);
+  border: 1px solid rgba(0, 229, 255, 0.4);
+  color: #FFFFFF;
   font-family: 'JetBrains Mono', monospace;
   font-weight: 700;
   font-size: 0.75rem;
-  padding: 0.5rem 1.25rem;
-  border-radius: 10px;
+  letter-spacing: 0.04em;
+  padding: 0.55rem 1.35rem;
+  border-radius: 12px;
   cursor: pointer;
-  transition: all 0.25s cubic-bezier(0.34, 1.56, 0.64, 1);
-  box-shadow: 0 4px 15px rgba(0, 102, 255, 0.3), inset 0 1px 0 rgba(255,255,255,0.1);
+  transition: all 0.22s cubic-bezier(0.16, 1, 0.3, 1);
+  box-shadow: 0 4px 20px rgba(0, 229, 255, 0.32), inset 0 1px 0 rgba(255, 255, 255, 0.3);
   position: relative;
   overflow: hidden;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.4);
 }
 .btn-primary::before {
   content: '';
   position: absolute;
   inset: 0;
-  background: linear-gradient(135deg, rgba(255,255,255,0.1), transparent);
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.2), transparent);
   opacity: 0;
   transition: opacity 0.2s;
 }
 .btn-primary:hover::before { opacity: 1; }
 .btn-primary:hover {
   transform: translateY(-2px);
-  box-shadow: 0 8px 25px rgba(0, 102, 255, 0.5), inset 0 1px 0 rgba(255,255,255,0.15);
+  box-shadow: 0 8px 30px rgba(0, 229, 255, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.4);
+  filter: brightness(1.08);
 }
-.btn-primary:active { transform: translateY(0) scale(0.97); }
+.btn-primary:active { transform: translateY(0) scale(0.98); }
 
 .btn-buy {
-  background: linear-gradient(135deg, #00cc6a, #009950);
-  border: 1px solid rgba(0, 255, 136, 0.4);
-  color: #fff;
+  background: linear-gradient(135deg, #00F59B 0%, #00B368 100%);
+  border: 1px solid rgba(0, 245, 155, 0.4);
+  color: #03140C;
   font-family: 'JetBrains Mono', monospace;
-  font-weight: 700;
+  font-weight: 800;
   font-size: 0.75rem;
-  padding: 0.5rem 1.25rem;
-  border-radius: 10px;
+  letter-spacing: 0.05em;
+  padding: 0.55rem 1.35rem;
+  border-radius: 12px;
   cursor: pointer;
-  transition: all 0.25s cubic-bezier(0.34, 1.56, 0.64, 1);
-  box-shadow: 0 4px 15px rgba(0, 204, 106, 0.3);
+  transition: all 0.22s cubic-bezier(0.16, 1, 0.3, 1);
+  box-shadow: 0 4px 20px rgba(0, 245, 155, 0.32), inset 0 1px 0 rgba(255, 255, 255, 0.4);
 }
 .btn-buy:hover {
   transform: translateY(-2px);
-  box-shadow: 0 8px 25px rgba(0, 204, 106, 0.5);
-  background: linear-gradient(135deg, #00e676, #00b359);
+  box-shadow: 0 8px 30px rgba(0, 245, 155, 0.55), inset 0 1px 0 rgba(255, 255, 255, 0.5);
+  background: linear-gradient(135deg, #1AFFA6 0%, #00C975 100%);
 }
-.btn-buy:active { transform: translateY(0) scale(0.97); }
+.btn-buy:active { transform: translateY(0) scale(0.98); }
 
 .btn-sell {
-  background: linear-gradient(135deg, #ff3366, #cc0033);
+  background: linear-gradient(135deg, #FF3366 0%, #C4103B 100%);
   border: 1px solid rgba(255, 51, 102, 0.4);
-  color: #fff;
+  color: #FFFFFF;
   font-family: 'JetBrains Mono', monospace;
-  font-weight: 700;
+  font-weight: 800;
   font-size: 0.75rem;
-  padding: 0.5rem 1.25rem;
-  border-radius: 10px;
+  letter-spacing: 0.05em;
+  padding: 0.55rem 1.35rem;
+  border-radius: 12px;
   cursor: pointer;
-  transition: all 0.25s cubic-bezier(0.34, 1.56, 0.64, 1);
-  box-shadow: 0 4px 15px rgba(255, 51, 102, 0.3);
+  transition: all 0.22s cubic-bezier(0.16, 1, 0.3, 1);
+  box-shadow: 0 4px 20px rgba(255, 51, 102, 0.32), inset 0 1px 0 rgba(255, 255, 255, 0.3);
 }
 .btn-sell:hover {
   transform: translateY(-2px);
-  box-shadow: 0 8px 25px rgba(255, 51, 102, 0.5);
-  background: linear-gradient(135deg, #ff4d7a, #e0003d);
+  box-shadow: 0 8px 30px rgba(255, 51, 102, 0.55), inset 0 1px 0 rgba(255, 255, 255, 0.4);
+  background: linear-gradient(135deg, #FF4D7B 0%, #DE0A41 100%);
 }
-.btn-sell:active { transform: translateY(0) scale(0.97); }
+.btn-sell:active { transform: translateY(0) scale(0.98); }
 
 .btn-ghost {
   background: rgba(255,255,255,0.04);
@@ -930,30 +942,35 @@
 }
 
 .app-nav-group-label {
-  color: #637286 !important;
-  font-family: 'Inter', sans-serif !important;
+  color: #64748B !important;
+  font-family: 'JetBrains Mono', monospace !important;
   font-size: 9px !important;
-  letter-spacing: 0.14em !important;
+  font-weight: 700 !important;
+  letter-spacing: 0.16em !important;
 }
 
 .app-nav-link {
-  min-height: 42px;
-  border-radius: 11px !important;
-  color: #8c9aab !important;
+  min-height: 44px;
+  border-radius: 12px !important;
+  color: #94A3B8 !important;
   font-family: 'Inter', sans-serif !important;
   font-size: 12px !important;
+  border: 1px solid transparent !important;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1) !important;
 }
 
 .app-nav-link:hover {
-  color: #e7edf2 !important;
-  background: rgba(255, 255, 255, 0.045) !important;
+  color: #FFFFFF !important;
+  background: rgba(255, 255, 255, 0.05) !important;
+  border-color: rgba(255, 255, 255, 0.08) !important;
+  transform: translateX(2px);
 }
 
 .app-nav-link.app-nav-active {
-  color: #eff8f7 !important;
-  background: linear-gradient(100deg, rgba(84, 214, 207, 0.13), rgba(84, 214, 207, 0.045)) !important;
-  border-color: rgba(84, 214, 207, 0.17) !important;
-  box-shadow: inset 2px 0 #58cec7, 0 5px 14px rgba(0, 0, 0, 0.12) !important;
+  color: #FFFFFF !important;
+  background: linear-gradient(90deg, rgba(0, 229, 255, 0.15) 0%, rgba(124, 58, 237, 0.06) 100%) !important;
+  border-color: rgba(0, 229, 255, 0.32) !important;
+  box-shadow: 0 4px 20px rgba(0, 229, 255, 0.14), inset 0 1px 0 rgba(255, 255, 255, 0.15) !important;
 }
 
 .app-content > .font-mono {

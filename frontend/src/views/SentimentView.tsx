@@ -7,7 +7,6 @@ import { useStore } from '../store/useStore';
 import { api } from '../services/api';
 import { SentimentAnalysis, NewsArticle } from '../types';
 import { SentimentGauge } from '../components/SentimentGauge';
-import { SectorSentimentHeatmap } from '../components/SectorSentimentHeatmap';
 import { classifyNewsCategory } from '../utils/categoryClassifier';
 
 const POPULAR_SYMBOLS = ['TCS', 'RELIANCE', 'INFY', 'HDFCBANK', 'ICICIBANK', 'SBIN', 'TATAMOTORS'];
@@ -20,7 +19,6 @@ export const SentimentView: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [refreshKey, setRefreshKey] = useState(0);
-  const [selectedCategory, setSelectedCategory] = useState<string>('ALL');
 
   useEffect(() => {
     let active = true;
@@ -56,13 +54,6 @@ export const SentimentView: React.FC = () => {
     setActiveTab('custom-news');
   };
 
-  const filteredNews = selectedCategory === 'ALL'
-    ? news
-    : news.filter(item => {
-        const cat = item.category || classifyNewsCategory(item.title, item.description || '', item.symbol || selectedSymbol);
-        return cat === selectedCategory;
-      });
-
   return (
     <div className="space-y-6 animate-fade-up font-sans">
       {/* ── TOP HERO HEADER ── */}
@@ -80,7 +71,7 @@ export const SentimentView: React.FC = () => {
               Financial News Sentiment · <span className="gradient-text">{selectedSymbol}</span>
             </h2>
             <p className="mt-1 text-xs text-slate-400 max-w-xl">
-              Transformer deep learning classification of real-time financial headlines, probability distributions, and sector-wide sentiment heatmaps.
+              Transformer deep learning classification of real-time financial headlines and probability distributions.
             </p>
           </div>
         </div>
@@ -123,15 +114,8 @@ export const SentimentView: React.FC = () => {
         </div>
       )}
 
-      {/* ── SECTOR HEATMAP & NEWS CONTENT ── */}
-      <div className="space-y-6">
-        <SectorSentimentHeatmap
-          articles={news}
-          selectedCategory={selectedCategory}
-          onSelectCategory={setSelectedCategory}
-        />
-
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      {/* ── NEWS CONTENT & SENTIMENT GAUGE ── */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           <div className="space-y-6">
             <SentimentGauge sentiment={sentiment} loading={loading} />
 
@@ -162,24 +146,11 @@ export const SentimentView: React.FC = () => {
                 <Newspaper className="w-5 h-5 text-cyan-400" />
                 <div>
                   <h3 className="text-sm font-bold text-white font-mono">Latest Headlines · Scored with FinBERT</h3>
-                  {selectedCategory !== 'ALL' && (
-                    <span className="text-[11px] text-purple-300 font-mono">
-                      Filtered by sector: <strong>{selectedCategory}</strong>
-                    </span>
-                  )}
                 </div>
               </div>
               <div className="flex items-center gap-2">
-                {selectedCategory !== 'ALL' && (
-                  <button
-                    onClick={() => setSelectedCategory('ALL')}
-                    className="text-xs px-2.5 py-1 rounded-lg border border-purple-500/30 bg-purple-950/40 text-purple-300 hover:text-white transition-colors"
-                  >
-                    Show All
-                  </button>
-                )}
                 <span className="badge badge-cyan font-mono">
-                  {filteredNews.length} / {news.length} ARTICLES
+                  {news.length} ARTICLES
                 </span>
               </div>
             </div>
@@ -189,13 +160,13 @@ export const SentimentView: React.FC = () => {
                 <RefreshCw className="w-6 h-6 animate-spin mx-auto mb-2 text-purple-400" />
                 Classifying headlines with FinBERT transformer weights…
               </div>
-            ) : filteredNews.length === 0 ? (
+            ) : news.length === 0 ? (
               <div className="rounded-xl border border-dashed border-slate-700 py-10 text-center text-xs text-slate-400 font-mono">
                 No matching headlines found.
               </div>
             ) : (
               <div className="space-y-3">
-                {filteredNews.map(item => {
+                {news.map(item => {
                   const pos = item.positive_score;
                   const neu = item.neutral_score;
                   const neg = item.negative_score;
@@ -284,7 +255,6 @@ export const SentimentView: React.FC = () => {
             )}
           </div>
         </div>
-      </div>
     </div>
   );
 };

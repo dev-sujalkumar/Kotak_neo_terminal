@@ -112,8 +112,21 @@ class FinBERTManager:
     def load_model(self):
         try:
             logger.info(f"Loading FinBERT model from {self.MODEL_NAME} onto {self.device}...")
-            self.tokenizer = AutoTokenizer.from_pretrained(self.MODEL_NAME)
-            self.model = AutoModelForSequenceClassification.from_pretrained(self.MODEL_NAME)
+            # 1. Try local cache first for instant offline startup
+            try:
+                self.tokenizer = AutoTokenizer.from_pretrained(self.MODEL_NAME, local_files_only=True)
+                self.model = AutoModelForSequenceClassification.from_pretrained(self.MODEL_NAME, local_files_only=True)
+            except Exception:
+                # 2. Check network connectivity with a 2-second timeout before attempting slow retries
+                import urllib.request
+                try:
+                    urllib.request.urlopen("https://huggingface.co", timeout=2)
+                    self.tokenizer = AutoTokenizer.from_pretrained(self.MODEL_NAME)
+                    self.model = AutoModelForSequenceClassification.from_pretrained(self.MODEL_NAME)
+                except Exception as net_err:
+                    logger.warning(f"HuggingFace unreachable or offline ({net_err}). Using fast built-in financial NLP engine.")
+                    return
+
             self.model.to(self.device)
             self.model.eval()
             # Map config id2label
@@ -121,7 +134,7 @@ class FinBERTManager:
                 self.labels = [self.model.config.id2label[i].lower() for i in range(len(self.model.config.id2label))]
             logger.info(f"FinBERT successfully loaded with labels: {self.labels}")
         except Exception as e:
-            logger.error(f"Error loading FinBERT: {e}. Fallback lexicons will be available.")
+            logger.warning(f"Error loading FinBERT: {e}. Fallback lexicons will be available.")
 
     def chunk_text(self, text: str, max_tokens: int = 400) -> List[str]:
         """Splits long financial articles into manageable chunks at sentence boundaries without losing context."""
@@ -993,4 +1006,4 @@ def analyze_custom_news(request: CustomNewsRequest):
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=False)
+    uvicorn.run(app, host="0.0.0.0", port=8000)

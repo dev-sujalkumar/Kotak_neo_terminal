@@ -11,3 +11,6 @@ venv/
 .venv/
 .next/
 coverage/
+*.log
+.vscode/
+.idea/

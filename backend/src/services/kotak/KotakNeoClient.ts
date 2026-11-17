@@ -20,7 +20,8 @@ import {
   TradeItem,
   LimitsData,
   QuoteInstrument,
-  ScripSearchParams
+  ScripSearchParams,
+  MarketDepth
 } from '../../types/index.js';
 
 function normalizeOrderType(value: unknown): string {
@@ -51,7 +52,7 @@ export interface IBrokerService {
   validateMpin(mpin: string, viewToken: string, viewSid: string, accessToken?: string): Promise<KotakValidateResponse>;
   getScripMasterPaths(): Promise<any>;
   searchScrip(params: ScripSearchParams): Promise<Record<string, unknown>[]>;
-  getQuotes(exchangeSegment: string, symbol: string, allowFallback?: boolean): Promise<QuoteData>;
+  getQuotes(exchangeSegment: string, symbol: string, allowFallback?: boolean, filterName?: string): Promise<QuoteData>;
   getQuotesBatch(instruments: QuoteInstrument[], quoteType?: string): Promise<Record<string, unknown>[]>;
   getHoldings(): Promise<HoldingItem[]>;
   getPositions(): Promise<PositionItem[]>;
@@ -63,6 +64,8 @@ export interface IBrokerService {
   getOrderBook(): Promise<OrderItem[]>;
   getOrderHistory(orderNumber: string): Promise<OrderItem[]>;
   getTradeBook(): Promise<TradeItem[]>;
+  connectOrderFeed(): WebSocket;
+  connectMarketFeed(): WebSocket;
   logout(): Promise<void>;
 }
 
@@ -119,8 +122,31 @@ export class KotakNeoBrokerService implements IBrokerService {
       e22: 'e22',
       e41: 'e41',
       e43: 'e43',
+      cis: 'cis',
     } as Record<string, string>)[(this.dataCenter || '').toLowerCase()] || 'mis';
     const socket = new WebSocket(`wss://${orderFeedHost}.kotaksecurities.com/realtime`);
+    socket.on('open', () => {
+      socket.send(JSON.stringify({
+        type: 'CONNECTION',
+        Authorization: this.sessionToken,
+        Sid: this.sessionSid,
+        source: 'WEB',
+      }));
+    });
+    return socket;
+  }
+
+  public connectMarketFeed(): WebSocket {
+    if (!this.isConnected()) throw new Error('Connect to Kotak Neo before opening the market feed.');
+    const host = ({
+      adc: 'cis',
+      e21: 'e21',
+      e22: 'e22',
+      e41: 'e41',
+      e43: 'e43',
+      cis: 'cis',
+    } as Record<string, string>)[(this.dataCenter || '').toLowerCase()] || 'cis';
+    const socket = new WebSocket(`wss://${host}.kotaksecurities.com/realtime`);
     socket.on('open', () => {
       socket.send(JSON.stringify({
         type: 'CONNECTION',
@@ -140,6 +166,8 @@ export class KotakNeoBrokerService implements IBrokerService {
     return {
       Auth: this.sessionToken || '',
       sid: this.sessionSid || '',
+      'neo-fin-key': 'neotradeapi',
+      accept: 'application/json',
     };
   }
 
@@ -246,11 +274,14 @@ export class KotakNeoBrokerService implements IBrokerService {
   async getScripMasterPaths(): Promise<Record<string, unknown>> {
     if (!this.isConnected()) throw new Error('Kotak session not active. Please authenticate via TOTP & MPIN.');
     const url = `${this.activeBaseUrl}/script-details/1.0/masterscrip/file-paths`;
+    const token = this.accessToken || config.kotak.accessToken;
 
     return kotakRateLimiter.enqueue(async () => {
       const res = await axios.get(url, {
         params: this.sessionQuery,
-        headers: this.sessionHeaders,
+        headers: {
+          Authorization: token,
+        },
       });
       return res.data;
     });
@@ -264,9 +295,12 @@ export class KotakNeoBrokerService implements IBrokerService {
 
     return kotakRateLimiter.enqueue(async () => {
       if (!this.scripMasterPaths) {
+        const token = this.accessToken || config.kotak.accessToken;
         const response = await axios.get(`${this.activeBaseUrl}/script-details/1.0/masterscrip/file-paths`, {
           params: this.sessionQuery,
-          headers: this.sessionHeaders,
+          headers: {
+            Authorization: token,
+          },
         });
         const data = response.data?.data || response.data?.result || response.data;
         this.scripMasterPaths = data.filesPaths || data.filePaths || null;
@@ -339,39 +373,78 @@ export class KotakNeoBrokerService implements IBrokerService {
   }
 
   // GET Quotes
-  async getQuotes(exchangeSegment: string, symbol: string, allowFallback: boolean = true): Promise<QuoteData> {
+  async getQuotes(exchangeSegment: string, symbol: string, allowFallback: boolean = true, filterName: string = 'all'): Promise<QuoteData> {
     const token = this.accessToken || config.kotak.accessToken;
-    const query = `${exchangeSegment.toLowerCase()}|${symbol}`;
-    const url = `${this.activeBaseUrl || config.kotak.baseLoginUrl}/script-details/1.0/quotes/neosymbol/${encodeURIComponent(query)}/all`;
+    const cleanSegment = exchangeSegment.toLowerCase();
+    const query = `${cleanSegment}|${symbol}`;
+    const cleanFilter = filterName.toLowerCase();
+    const url = `${this.activeBaseUrl || config.kotak.baseLoginUrl}/script-details/1.0/quotes/neosymbol/${encodeURIComponent(query)}/${cleanFilter}`;
 
     return kotakRateLimiter.enqueue(async () => {
       try {
         const res = await axios.get(url, {
-          headers: { 'Authorization': token },
+          headers: {
+            Authorization: token,
+            'Content-Type': 'application/json',
+          },
         });
 
-        const raw = res.data?.result?.[0] || res.data?.data?.[0] || res.data?.[0] || {};
+        const raw = res.data?.result?.[0] || res.data?.data?.[0] || (Array.isArray(res.data) ? res.data[0] : res.data) || {};
+
+        let depthData: MarketDepth | undefined = undefined;
+        if (raw.depth && (Array.isArray(raw.depth.buy) || Array.isArray(raw.depth.sell))) {
+          depthData = {
+            buy: Array.isArray(raw.depth.buy) ? raw.depth.buy.map((b: any) => ({
+              price: b.price ?? 0,
+              quantity: b.quantity ?? 0,
+              orders: b.orders ?? 0,
+            })) : [],
+            sell: Array.isArray(raw.depth.sell) ? raw.depth.sell.map((s: any) => ({
+              price: s.price ?? 0,
+              quantity: s.quantity ?? 0,
+              orders: s.orders ?? 0,
+            })) : [],
+          };
+        }
+
+        const ohlcObj = raw.ohlc ? {
+          open: parseFloat(String(raw.ohlc.open ?? '0')),
+          high: parseFloat(String(raw.ohlc.high ?? '0')),
+          low: parseFloat(String(raw.ohlc.low ?? '0')),
+          close: parseFloat(String(raw.ohlc.close ?? '0')),
+        } : undefined;
+
+        const bestBid = depthData?.buy?.[0];
+        const bestAsk = depthData?.sell?.[0];
+
         return {
           symbol,
-          tradingSymbol: raw.ts || `${symbol}-EQ`,
+          tradingSymbol: raw.display_symbol || raw.ts || `${symbol}-EQ`,
           exchangeSegment,
           ltp: parseFloat(raw.ltp || raw.lastPrice || '0.0'),
-          change: parseFloat(raw.cng || raw.change || '0.0'),
-          changePercent: parseFloat(raw.nc || raw.changePercent || '0.0'),
-          open: parseFloat(raw.op || raw.open || '0.0'),
-          high: parseFloat(raw.h || raw.high || '0.0'),
-          low: parseFloat(raw.lo || raw.low || '0.0'),
-          close: parseFloat(raw.c || raw.close || raw.previousClose || '0.0'),
-          volume: parseInt(raw.v || raw.volume || '0', 10),
-          bidPrice: parseFloat(raw.bp || raw.bidPrice || '0.0'),
-          bidQty: parseInt(raw.bq || raw.bidQty || '0', 10),
-          askPrice: parseFloat(raw.sp || raw.askPrice || '0.0'),
-          askQty: parseInt(raw.sq || raw.askQty || '0', 10),
-          fiftyTwoWeekHigh: parseFloat(raw.yh || raw.fiftyTwoWeekHigh || '0.0'),
-          fiftyTwoWeekLow: parseFloat(raw.yl || raw.fiftyTwoWeekLow || '0.0'),
-          upperCircuit: parseFloat(raw.ucl || raw.upperCircuit || '0.0'),
-          lowerCircuit: parseFloat(raw.lcl || raw.lowerCircuit || '0.0'),
-          lastUpdated: new Date().toISOString(),
+          change: parseFloat(raw.change || raw.cng || '0.0'),
+          changePercent: parseFloat(raw.per_change || raw.nc || raw.changePercent || '0.0'),
+          open: ohlcObj?.open || parseFloat(raw.open || raw.op || '0.0'),
+          high: ohlcObj?.high || parseFloat(raw.high || raw.h || '0.0'),
+          low: ohlcObj?.low || parseFloat(raw.low || raw.lo || '0.0'),
+          close: ohlcObj?.close || parseFloat(raw.close || raw.c || raw.previousClose || '0.0'),
+          volume: parseInt(raw.last_volume || raw.volume || raw.v || '0', 10),
+          bidPrice: bestBid ? parseFloat(String(bestBid.price)) : parseFloat(raw.bidPrice || raw.bp || '0.0'),
+          bidQty: bestBid ? parseInt(String(bestBid.quantity), 10) : parseInt(raw.bidQty || raw.bq || '0', 10),
+          askPrice: bestAsk ? parseFloat(String(bestAsk.price)) : parseFloat(raw.askPrice || raw.sp || '0.0'),
+          askQty: bestAsk ? parseInt(String(bestAsk.quantity), 10) : parseInt(raw.askQty || raw.sq || '0', 10),
+          fiftyTwoWeekHigh: parseFloat(raw.year_high || raw.fiftyTwoWeekHigh || raw.yh || '0.0'),
+          fiftyTwoWeekLow: parseFloat(raw.year_low || raw.fiftyTwoWeekLow || raw.yl || '0.0'),
+          upperCircuit: parseFloat(raw.upperCircuit || raw.ucl || '0.0'),
+          lowerCircuit: parseFloat(raw.lowerCircuit || raw.lcl || '0.0'),
+          lastUpdated: raw.lstup_time ? new Date(parseInt(raw.lstup_time, 10) * 1000).toISOString() : new Date().toISOString(),
+          depth: depthData,
+          ohlc: raw.ohlc,
+          totalBuy: raw.total_buy,
+          totalSell: raw.total_sell,
+          lastTradedQuantity: raw.last_traded_quantity,
+          exchangeToken: raw.exchange_token,
+          displaySymbol: raw.display_symbol,
         };
       } catch (err: any) {
         logger.warn('Kotak Neo quote request failed', {
@@ -417,46 +490,60 @@ export class KotakNeoBrokerService implements IBrokerService {
 
     const url = `${this.activeBaseUrl}/quick/user/check-margin`;
     return kotakRateLimiter.enqueue(async () => {
-      const form = new URLSearchParams({
+      const jData: Record<string, string> = {
+        brkName: params.brokerName || 'KOTAK',
+        brnchId: params.branchId || 'ONLINE',
         exSeg: params.exchangeSegment,
-        prc: String(params.price),
-        prcTp: params.orderType || 'L',
+        prc: String(params.price ?? 0),
+        prcTp: params.orderType === 'MARKET' ? 'MKT' : (params.orderType || 'L'),
         prod: params.product,
         qty: String(params.quantity),
         tok: params.instrumentToken || '',
         trnsTp: params.transactionType === 'BUY' ? 'B' : 'S',
-        trgPrc: String(params.triggerPrice || 0),
-        brkName: params.brokerName || 'KOTAK',
-        brnchId: params.branchId || 'ONLINE',
-        slAbsOrTks: params.stopLossType || '',
-        slVal: String(params.stopLossValue || 0),
-        sqrOffAbsOrTks: params.squareOffType || '',
-        sqrOffVal: String(params.squareOffValue || 0),
-        trailSL: params.trailingStopLoss || '',
-        tSLTks: String(params.trailingStopLossValue || 0),
-      });
-      const res = await axios.post(url, form.toString(), {
+      };
+
+      if (params.stopLossType) jData.slAbsOrTks = params.stopLossType;
+      if (params.stopLossValue !== undefined) jData.slVal = String(params.stopLossValue);
+      if (params.squareOffType) jData.sqrOffAbsOrTks = params.squareOffType;
+      if (params.squareOffValue !== undefined) jData.sqrOffVal = String(params.squareOffValue);
+      if (params.trailingStopLoss) jData.trailSL = params.trailingStopLoss;
+      if (params.triggerPrice !== undefined) jData.trgPrc = String(params.triggerPrice);
+      if (params.trailingStopLossValue !== undefined) jData.tSLTks = String(params.trailingStopLossValue);
+
+      const formData = new URLSearchParams();
+      formData.append('jData', JSON.stringify(jData));
+
+      const res = await axios.post(url, formData.toString(), {
         params: this.sessionQuery,
         headers: {
           ...this.sessionHeaders,
           'Content-Type': 'application/x-www-form-urlencoded',
         },
       });
-      const data = res.data?.data || res.data?.result || res.data;
+
+      const data = res.data?.data || res.data?.result || res.data || {};
       const availableCash = Number(data.avlCash ?? data.availCash ?? 0);
       const availableMargin = Number(data.avlMrgn ?? data.availMargin ?? 0);
       const requiredMargin = Number(data.reqdMrgn ?? data.reqMargin ?? 0);
       const orderMargin = Number(data.ordMrgn ?? data.orderMargin ?? 0);
-      if (![availableCash, availableMargin, requiredMargin, orderMargin].every(Number.isFinite)) {
-        throw new Error('Kotak Neo returned an invalid margin response.');
-      }
+      const totMrgnUsd = Number(data.totMrgnUsd ?? 0);
+      const mrgnUsd = Number(data.mrgnUsd ?? 0);
+      const insufFund = Number(data.insufFund ?? 0);
+
+      const isOk = (String(data.rmsVldtd || '').toUpperCase() === 'OK' || String(data.stat || '').toUpperCase() === 'OK') && insufFund === 0;
+
       return {
         availableCash,
         availableMargin,
         requiredMargin,
         orderMargin,
-        sufficientFunds: String(data.rmsVldtd || '').toUpperCase() === 'OK' && Number(data.insufFund || 0) === 0,
-        statusMessage: String(data.rmsVldtd || data.stat || 'Margin checked successfully'),
+        totMrgnUsd,
+        mrgnUsd,
+        insufFund,
+        sufficientFunds: isOk,
+        statusMessage: isOk ? 'Margin verified successfully' : (data.emsg || `Insufficient funds: ₹${insufFund}`),
+        rmsVldtd: data.rmsVldtd,
+        stat: data.stat,
       };
     });
   }
@@ -467,31 +554,33 @@ export class KotakNeoBrokerService implements IBrokerService {
 
     const url = `${this.activeBaseUrl}/quick/order/rule/ms/place`;
     const orderType = params.orderType === 'MARKET' ? 'MKT' : params.orderType === 'LIMIT' ? 'L' : params.orderType;
-    const jData = {
+    const jData: Record<string, any> = {
       am: params.isAmo ? 'YES' : 'NO',
-      dq: params.disclosedQuantity ?? 0,
+      dq: String(params.disclosedQuantity ?? 0),
       es: params.exchangeSegment,
-      mp: params.marketProtection ?? 0,
+      mp: params.marketProtection !== undefined ? Number(params.marketProtection) : 0,
       pc: params.product,
       pf: 'N',
-      pr: params.price ?? 0,
+      pr: String(params.price ?? 0),
       pt: orderType,
-      qt: params.quantity,
+      qt: String(params.quantity),
       rt: params.validity || 'DAY',
-      tp: params.triggerPrice ?? 0,
+      tp: String(params.triggerPrice ?? 0),
       ts: params.tradingSymbol,
       tt: params.transactionType === 'BUY' ? 'B' : 'S',
-      ig: params.tag,
-      tk: params.scripToken,
-      sot: params.squareOffType,
-      slt: params.stopLossType,
-      slv: params.stopLossValue,
-      sov: params.squareOffValue,
-      lat: params.lastTradedPrice,
-      tlt: params.trailingStopLoss,
-      tsv: params.trailingStopLossValue,
-      os: 'WEB',
+      sot: params.squareOffType || '',
+      slt: params.stopLossType || '',
+      slv: params.stopLossValue !== undefined ? String(params.stopLossValue) : '',
+      sov: params.squareOffValue !== undefined ? String(params.squareOffValue) : '',
+      tlt: params.trailingStopLoss || '',
+      tsv: params.trailingStopLossValue !== undefined ? String(params.trailingStopLossValue) : '',
     };
+    if (params.tag) {
+      jData.ig = params.tag;
+    }
+    if (params.scripToken) {
+      jData.tk = params.scripToken;
+    }
 
     const formData = new URLSearchParams();
     formData.append('jData', JSON.stringify(jData));
@@ -508,7 +597,7 @@ export class KotakNeoBrokerService implements IBrokerService {
       const data = res.data?.data || res.data?.result || res.data;
       const orderNumber = data.nOrdNo || data.nMsgId || data.orderId;
       if (!orderNumber || (data.stat && data.stat.toLowerCase() !== 'ok')) {
-        throw new Error(data.errMsg || data.message || 'Kotak did not confirm order placement.');
+        throw new Error(data.emsg || data.errMsg || data.message || 'Kotak did not confirm order placement.');
       }
       return {
         orderNumber: String(orderNumber),
@@ -530,36 +619,39 @@ export class KotakNeoBrokerService implements IBrokerService {
       params.scripToken = String(scrip.pSymbol);
     }
     const url = `${this.activeBaseUrl}/quick/order/vr/modify`;
-    const body = {
-      on: params.orderNumber,
-      es: params.exchangeSegment,
+    const jData: Record<string, string> = {
+      no: params.orderNumber,
+      tk: params.scripToken || '',
+      fq: params.filledQuantity !== undefined ? String(params.filledQuantity) : '0',
+      mp: String(params.marketProtection ?? 0),
       pc: params.product,
-      pr: params.price ?? 0,
-      pt: params.orderType === 'MARKET' ? 'MKT' : params.orderType === 'LIMIT' ? 'L' : params.orderType,
-      qt: params.quantity,
-      rt: params.validity || 'DAY',
+      dd: 'NA',
+      dq: String(params.disclosedQuantity ?? 0),
+      vd: params.validity || 'DAY',
       ts: params.tradingSymbol,
-      tt: params.transactionType === 'BUY' ? 'B' : params.transactionType === 'SELL' ? 'S' : undefined,
-      tp: params.triggerPrice ?? 0,
-      dq: params.disclosedQuantity ?? 0,
-      dd: params.filledQuantity ?? 0,
-      mp: params.marketProtection ?? 0,
+      tt: params.transactionType === 'BUY' ? 'B' : params.transactionType === 'SELL' ? 'S' : 'B',
+      pr: String(params.price ?? 0),
+      tp: String(params.triggerPrice ?? 0),
+      qt: String(params.quantity),
+      es: params.exchangeSegment,
+      pt: params.orderType === 'MARKET' ? 'MKT' : params.orderType === 'LIMIT' ? 'L' : params.orderType,
       am: params.isAmo ? 'YES' : 'NO',
-      tk: params.scripToken,
-      pf: 'N',
     };
 
+    const formData = new URLSearchParams();
+    formData.append('jData', JSON.stringify(jData));
+
     return kotakRateLimiter.enqueue(async () => {
-      const res = await axios.post(url, body, {
+      const res = await axios.post(url, formData.toString(), {
         params: this.sessionQuery,
         headers: {
           ...this.sessionHeaders,
-          'Content-Type': 'application/json',
+          'Content-Type': 'application/x-www-form-urlencoded',
         },
       });
       const data = res.data?.data || res.data?.result || res.data;
       if (data.stat && data.stat.toLowerCase() !== 'ok') {
-        throw new Error(data.errMsg || data.message || 'Kotak rejected the order modification.');
+        throw new Error(data.emsg || data.errMsg || data.message || 'Kotak rejected the order modification.');
       }
       return {
         orderNumber: String(data.nOrdNo || data.nMsgId || params.orderNumber),
@@ -581,13 +673,20 @@ export class KotakNeoBrokerService implements IBrokerService {
     const endpoint = orderClass === 'COVER' ? 'quick/order/co/exit'
       : orderClass === 'BRACKET' ? 'quick/order/bo/exit' : 'quick/order/cancel';
     const url = `${this.activeBaseUrl}/${endpoint}`;
-    const body = new URLSearchParams({
+
+    const jData: Record<string, string> = {
       on: params.orderNumber,
       am: params.amo ? 'YES' : 'NO',
-    });
+    };
+    if (params.tradingSymbol) {
+      jData.ts = params.tradingSymbol;
+    }
+
+    const formData = new URLSearchParams();
+    formData.append('jData', JSON.stringify(jData));
 
     return kotakRateLimiter.enqueue(async () => {
-      const res = await axios.post(url, body.toString(), {
+      const res = await axios.post(url, formData.toString(), {
         params: this.sessionQuery,
         headers: {
           ...this.sessionHeaders,
@@ -596,7 +695,7 @@ export class KotakNeoBrokerService implements IBrokerService {
       });
       const data = res.data?.data || res.data?.result || res.data;
       if (data.stat && data.stat.toLowerCase() !== 'ok') {
-        throw new Error(data.errMsg || data.message || 'Kotak rejected the cancellation.');
+        throw new Error(data.emsg || data.message || 'Kotak rejected the cancellation.');
       }
       return { status: String(data.status || data.stat || 'success') };
     });
@@ -616,20 +715,20 @@ export class KotakNeoBrokerService implements IBrokerService {
       if (!Array.isArray(list)) throw new Error('Kotak returned an unexpected order book response.');
       return list.map((item: any) => ({
         orderNumber: item.nOrdNo || item.nMsgId || item.orderId || '',
-        symbol: item.sym || item.ts?.split('-')[0] || '',
-        tradingSymbol: item.ts || '',
-        exchangeSegment: item.es || '',
-        transactionType: item.tt === 'B' ? 'BUY' : 'SELL',
-        orderType: normalizeOrderType(item.pt),
-        product: item.pc || 'CNC',
-        quantity: parseInt(item.qt || '0', 10),
-        price: parseFloat(item.pr || '0'),
-        averagePrice: parseFloat(item.avgPr || '0'),
+        symbol: item.sym || item.trdSym?.split('-')[0] || item.ts?.split('-')[0] || '',
+        tradingSymbol: item.trdSym || item.ts || '',
+        exchangeSegment: item.exSeg || item.es || '',
+        transactionType: item.trnsTp === 'B' || item.tt === 'B' ? 'BUY' : 'SELL',
+        orderType: normalizeOrderType(item.prcTp || item.pt),
+        product: item.prod || item.pc || 'CNC',
+        quantity: parseInt(item.qty || item.qt || '0', 10),
+        price: parseFloat(item.prc || item.pr || '0'),
+        averagePrice: parseFloat(item.avgPrc || item.avgPr || '0'),
         status: item.ordSt || item.st || item.status || 'UNKNOWN',
-        validity: item.rt || 'DAY',
+        validity: item.vldt || item.rt || 'DAY',
         rejectionReason: item.rejRsn || item.rejReason || '',
-        orderTime: item.ordTime || item.exchOrdTime || '',
-        isAmo: item.am === 'YES',
+        orderTime: item.ordDtTm || item.ordTime || item.exchOrdTime || '',
+        isAmo: item.ordGenTp === 'AMO' || item.am === 'YES',
       }));
     });
   }
@@ -638,8 +737,10 @@ export class KotakNeoBrokerService implements IBrokerService {
     if (!this.isConnected()) throw new Error('Connect to Kotak Neo to retrieve live order history.');
     const url = `${this.activeBaseUrl}/quick/order/history`;
     return kotakRateLimiter.enqueue(async () => {
-      const body = new URLSearchParams({ nOrdNo: orderNumber });
-      const response = await axios.post(url, body.toString(), {
+      const formData = new URLSearchParams();
+      formData.append('jData', JSON.stringify({ nOrdNo: orderNumber }));
+
+      const response = await axios.post(url, formData.toString(), {
         params: this.sessionQuery,
         headers: {
           ...this.sessionHeaders,
@@ -650,20 +751,20 @@ export class KotakNeoBrokerService implements IBrokerService {
       if (!Array.isArray(list)) throw new Error('Kotak returned an unexpected order history response.');
       return list.map((item: any) => ({
         orderNumber: item.nOrdNo || item.nMsgId || item.orderId || orderNumber,
-        symbol: item.sym || item.ts?.split('-')[0] || '',
-        tradingSymbol: item.ts || '',
-        exchangeSegment: item.es || '',
-        transactionType: item.tt === 'B' ? 'BUY' : 'SELL',
-        orderType: normalizeOrderType(item.pt),
-        product: item.pc || '',
-        quantity: parseInt(item.qt || '0', 10),
-        price: parseFloat(item.pr || '0'),
-        averagePrice: parseFloat(item.avgPr || '0'),
+        symbol: item.sym || item.trdSym?.split('-')[0] || item.ts?.split('-')[0] || '',
+        tradingSymbol: item.trdSym || item.ts || '',
+        exchangeSegment: item.exSeg || item.es || '',
+        transactionType: item.trnsTp === 'B' || item.tt === 'B' ? 'BUY' : 'SELL',
+        orderType: normalizeOrderType(item.prcTp || item.pt),
+        product: item.prod || item.pc || '',
+        quantity: parseInt(item.qty || item.qt || '0', 10),
+        price: parseFloat(item.prc || item.pr || '0'),
+        averagePrice: parseFloat(item.avgPrc || item.avgPr || '0'),
         status: item.ordSt || item.st || item.status || 'UNKNOWN',
-        validity: item.rt || 'DAY',
+        validity: item.vldt || item.rt || 'DAY',
         rejectionReason: item.rejRsn || '',
-        orderTime: item.ordTime || item.exchOrdTime || '',
-        isAmo: item.am === 'YES',
+        orderTime: item.flDtTm || item.ordTime || item.exchOrdTime || '',
+        isAmo: item.am === 'YES' || item.ordGenTp === 'AMO',
       }));
     });
   }
@@ -682,19 +783,19 @@ export class KotakNeoBrokerService implements IBrokerService {
       if (!Array.isArray(list)) throw new Error('Kotak returned an unexpected trade book response.');
       return list.map((item: any) => ({
         orderNumber: item.nOrdNo || item.nMsgId || item.orderId || '',
-        tradeId: item.trdId || item.nTrdNum || '',
-        symbol: item.sym || item.ts?.split('-')[0] || '',
-        tradingSymbol: item.ts || '',
-        exchangeSegment: item.es || '',
-        transactionType: item.tt === 'B' ? 'BUY' : 'SELL',
-        quantity: parseInt(item.qt || '0', 10),
+        tradeId: item.exOrdId || item.trdId || item.nTrdNum || '',
+        symbol: item.sym || item.trdSym?.split('-')[0] || item.ts?.split('-')[0] || '',
+        tradingSymbol: item.trdSym || item.ts || '',
+        exchangeSegment: item.exSeg || item.es || 'nse_cm',
+        transactionType: item.trnsTp === 'B' || item.tt === 'B' ? 'BUY' : 'SELL',
+        quantity: parseInt(item.qty || item.fldQty || item.qt || '0', 10),
         averagePrice: parseFloat(item.avgPrc || item.pr || '0'),
-        tradeTime: item.trdTime || item.flTrdTime || '',
+        tradeTime: item.exTm || item.flDt || item.trdTime || '',
       }));
     });
   }
 
-  // Holdings - with retry logic
+  // Holdings - with rich v2 response fields and retry logic
   async getHoldings(retries: number = 3): Promise<HoldingItem[]> {
     if (!this.isConnected()) throw new Error('Connect to Kotak Neo to retrieve live holdings.');
     const url = `${this.activeBaseUrl}/portfolio/v1/holdings`;
@@ -710,29 +811,61 @@ export class KotakNeoBrokerService implements IBrokerService {
           const responseData = res.data?.result || res.data?.data || res.data;
           const list = Array.isArray(responseData) ? responseData : responseData?.holdings;
           if (!Array.isArray(list)) throw new Error('Kotak returned an unexpected holdings response.');
-          const holdings = list.map((item: any) => {
+          const holdings: HoldingItem[] = list.map((item: any) => {
             const qty = Number(item.quantity ?? item.qty ?? 0);
             const avg = Number(item.averagePrice ?? item.avgPrice ?? 0);
-            const ltp = Number(item.ltp ?? item.closingPrice ?? 0);
-            const symbol = item.displaySymbol || item.symbol || item.ts?.split('-')[0] || '';
+            const ltp = Number(item.closingPrice ?? item.ltp ?? item.prevDayLtp ?? 0);
+            const symbol = item.symbol || item.displaySymbol || item.ts?.split('-')[0] || '';
             const reportedCost = Number(item.holdingCost);
             const inv = Number.isFinite(reportedCost) ? reportedCost : qty * avg;
             const reportedValue = Number(item.mktValue);
             const cur = Number.isFinite(reportedValue) ? reportedValue : qty * ltp;
+            const unrealized = item.unrealisedGainLoss !== undefined ? Number(item.unrealisedGainLoss) : cur - inv;
+
             return {
               symbol,
-              tradingSymbol: item.ts || item.tradingSymbol || `${symbol}-EQ`,
+              tradingSymbol: item.tradingSymbol || item.trdSym || item.ts || (symbol ? `${symbol}-EQ` : item.displaySymbol || ''),
               exchangeSegment: item.exchangeSegment || item.es || 'nse_cm',
               quantity: qty,
               averagePrice: avg,
               currentPrice: ltp,
               investedValue: inv,
               currentValue: cur,
-              unrealizedPnL: cur - inv,
-              unrealizedPnLPct: inv > 0 ? ((cur - inv) / inv) * 100 : 0,
+              unrealizedPnL: unrealized,
+              unrealizedPnLPct: inv > 0 ? (unrealized / inv) * 100 : 0,
+              // Kotak v2 rich properties
+              instrumentType: item.instrumentType,
+              sector: item.sector,
+              instrumentToken: item.instrumentToken,
+              commonScripCode: item.commonScripCode,
+              instrumentName: item.instrumentName,
+              holdingCost: reportedCost,
+              closingPrice: Number(item.closingPrice),
+              mktValue: reportedValue,
+              scripId: item.scripId,
+              isAlternateScrip: item.isAlternateScrip,
+              unrealisedGainLoss: unrealized,
+              sqGainLoss: item.sqGainLoss !== undefined ? Number(item.sqGainLoss) : undefined,
+              delGainLoss: item.delGainLoss !== undefined ? Number(item.delGainLoss) : undefined,
+              subTotal: item.subTotal !== undefined ? Number(item.subTotal) : undefined,
+              prevDayLtp: item.prevDayLtp !== undefined ? Number(item.prevDayLtp) : undefined,
+              subType: item.subType,
+              instrumentStatus: item.instrumentStatus,
+              marketLot: item.marketLot !== undefined ? Number(item.marketLot) : undefined,
+              expiryDate: item.expiryDate,
+              optType: item.optType,
+              strikePrice: item.strikePrice,
+              displaySymbol: item.displaySymbol,
+              series: item.series,
+              exchangeIdentifier: item.exchangeIdentifier,
+              sellableQuantity: item.sellableQuantity !== undefined ? Number(item.sellableQuantity) : qty,
+              securityType: item.securityType,
+              securitySubType: item.securitySubType,
+              logoUrl: item.logoUrl,
+              cmotCode: item.cmotCode,
             };
           });
-          
+
           logger.info(`✓ Fetched ${holdings.length} holdings from Kotak API on attempt ${attempt}`);
           return holdings;
         });
@@ -740,21 +873,21 @@ export class KotakNeoBrokerService implements IBrokerService {
         const isLastAttempt = attempt === retries;
         const errorMsg = err.response?.data?.message || err.message;
         logger.warn(`Holdings API attempt ${attempt}/${retries} failed: ${errorMsg}`);
-        
+
         if (isLastAttempt) {
           logger.error('Holdings API failed after all retries');
           throw new Error(`Kotak holdings request failed: ${errorMsg}`);
         }
-        
+
         // Exponential backoff: wait 1s, 2s, 4s
         await new Promise(resolve => setTimeout(resolve, Math.pow(2, attempt - 1) * 1000));
       }
     }
-    
+
     throw new Error('Kotak holdings request did not complete.');
   }
 
-  // Positions - with retry logic
+  // Positions - with rich v2 response fields and retry logic
   async getPositions(retries: number = 3): Promise<PositionItem[]> {
     if (!this.isConnected()) throw new Error('Connect to Kotak Neo to retrieve live positions.');
     const url = `${this.activeBaseUrl}/quick/user/positions`;
@@ -770,20 +903,36 @@ export class KotakNeoBrokerService implements IBrokerService {
           const responseData = res.data?.result || res.data?.data || res.data;
           const list = Array.isArray(responseData) ? responseData : responseData?.positions;
           if (!Array.isArray(list)) throw new Error('Kotak returned an unexpected positions response.');
-          const positions = list.map((item: any) => ({
-            symbol: item.symbol || item.ts?.split('-')[0] || '',
-            tradingSymbol: item.ts || '',
-            exchangeSegment: item.es || 'nse_cm',
-            product: item.pc || 'CNC',
-            netQuantity: parseInt(item.netQty || '0', 10),
-            buyQty: parseInt(item.buyQty || '0', 10),
-            buyValue: parseFloat(item.buyVal || '0'),
-            sellQty: parseInt(item.sellQty || '0', 10),
-            sellValue: parseFloat(item.sellVal || '0'),
-            averagePrice: parseFloat(item.avgPrice || '0'),
+          const positions: PositionItem[] = list.map((item: any) => ({
+            symbol: item.sym || item.symbol || item.trdSym?.split('-')[0] || item.ts?.split('-')[0] || '',
+            tradingSymbol: item.trdSym || item.ts || '',
+            exchangeSegment: item.exSeg || item.es || 'nse_cm',
+            product: item.prod || item.pc || 'CNC',
+            netQuantity: parseInt(item.qty || item.netQty || '0', 10),
+            buyQty: parseInt(item.flBuyQty || item.buyQty || '0', 10),
+            buyValue: parseFloat(item.buyAmt || item.buyValue || item.buyVal || '0'),
+            sellQty: parseInt(item.flSellQty || item.sellQty || '0', 10),
+            sellValue: parseFloat(item.sellAmt || item.sellValue || item.sellVal || '0'),
+            averagePrice: parseFloat(item.avgPrice || item.stkPrc || '0'),
             realizedPnL: parseFloat(item.realizedPnL || '0'),
+            actId: item.actId,
+            sym: item.sym,
+            buyAmt: item.buyAmt,
+            sellAmt: item.sellAmt,
+            flBuyQty: item.flBuyQty,
+            flSellQty: item.flSellQty,
+            brdLtQty: item.brdLtQty !== undefined ? Number(item.brdLtQty) : undefined,
+            posFlg: item.posFlg,
+            sqrFlg: item.sqrFlg,
+            lotSz: item.lotSz,
+            stkPrc: item.stkPrc,
+            hsUpTm: item.hsUpTm,
+            cfBuyAmt: item.cfBuyAmt,
+            cfSellAmt: item.cfSellAmt,
+            cfBuyQty: item.cfBuyQty,
+            cfSellQty: item.cfSellQty,
           }));
-          
+
           logger.info(`✓ Fetched ${positions.length} positions from Kotak API on attempt ${attempt}`);
           return positions;
         });
@@ -791,17 +940,17 @@ export class KotakNeoBrokerService implements IBrokerService {
         const isLastAttempt = attempt === retries;
         const errorMsg = err.response?.data?.message || err.message;
         logger.warn(`Positions API attempt ${attempt}/${retries} failed: ${errorMsg}`);
-        
+
         if (isLastAttempt) {
           logger.error('Positions API failed after all retries');
           throw new Error(`Kotak positions request failed: ${errorMsg}`);
         }
-        
+
         // Exponential backoff
         await new Promise(resolve => setTimeout(resolve, Math.pow(2, attempt - 1) * 1000));
       }
     }
-    
+
     throw new Error('Kotak positions request did not complete.');
   }
 
@@ -823,8 +972,7 @@ export class KotakNeoBrokerService implements IBrokerService {
       const res = await axios.post(url, form.toString(), {
         params: this.serverId ? { sId: this.serverId } : undefined,
         headers: {
-          'Auth': this.sessionToken,
-          'sid': this.sessionSid,
+          ...this.sessionHeaders,
           'Content-Type': 'application/x-www-form-urlencoded',
         },
       });

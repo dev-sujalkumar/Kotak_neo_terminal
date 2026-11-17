@@ -27,6 +27,17 @@ export interface KotakValidateResponse {
   status: string;
 }
 
+export interface MarketDepthLevel {
+  price: number | string;
+  quantity: number | string;
+  orders: number | string;
+}
+
+export interface MarketDepth {
+  buy: MarketDepthLevel[];
+  sell: MarketDepthLevel[];
+}
+
 export interface QuoteData {
   symbol: string;
   tradingSymbol: string;
@@ -51,6 +62,18 @@ export interface QuoteData {
   dataSource?: string;
   marketState?: string;
   currency?: string;
+  depth?: MarketDepth;
+  ohlc?: {
+    open: number | string;
+    high: number | string;
+    low: number | string;
+    close: number | string;
+  };
+  totalBuy?: number | string;
+  totalSell?: number | string;
+  lastTradedQuantity?: number | string;
+  exchangeToken?: string;
+  displaySymbol?: string;
 }
 
 export interface OrderPlacementParams {
@@ -132,6 +155,11 @@ export interface MarginCheckResponse {
   orderMargin: number;
   sufficientFunds: boolean;
   statusMessage: string;
+  totMrgnUsd?: number;
+  mrgnUsd?: number;
+  insufFund?: number;
+  rmsVldtd?: string;
+  stat?: string;
 }
 
 export interface HoldingItem {
@@ -145,6 +173,36 @@ export interface HoldingItem {
   currentValue: number;
   unrealizedPnL: number;
   unrealizedPnLPct: number;
+  // Kotak v2 Rich Holdings response fields
+  instrumentType?: string;
+  sector?: string;
+  instrumentToken?: number | string;
+  commonScripCode?: string;
+  instrumentName?: string;
+  holdingCost?: number;
+  closingPrice?: number;
+  mktValue?: number;
+  scripId?: string;
+  isAlternateScrip?: string | boolean;
+  unrealisedGainLoss?: number;
+  sqGainLoss?: number;
+  delGainLoss?: number;
+  subTotal?: number;
+  prevDayLtp?: number;
+  subType?: string;
+  instrumentStatus?: string;
+  marketLot?: number;
+  expiryDate?: string;
+  optType?: string;
+  strikePrice?: string;
+  displaySymbol?: string;
+  series?: string;
+  exchangeIdentifier?: string;
+  sellableQuantity?: number;
+  securityType?: string;
+  securitySubType?: string;
+  logoUrl?: string;
+  cmotCode?: string;
 }
 
 export interface PositionItem {
@@ -159,6 +217,23 @@ export interface PositionItem {
   sellValue: number;
   averagePrice: number;
   realizedPnL: number;
+  // Kotak v2 Position Book fields
+  actId?: string;
+  sym?: string;
+  buyAmt?: string | number;
+  sellAmt?: string | number;
+  flBuyQty?: string | number;
+  flSellQty?: string | number;
+  brdLtQty?: number;
+  posFlg?: string;
+  sqrFlg?: string;
+  lotSz?: string | number;
+  stkPrc?: string;
+  hsUpTm?: string;
+  cfBuyAmt?: string;
+  cfSellAmt?: string;
+  cfBuyQty?: string;
+  cfSellQty?: string;
 }
 
 export interface OrderItem {

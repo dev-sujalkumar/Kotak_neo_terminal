@@ -1,3 +1,14 @@
+export interface MarketDepthLevel {
+  price: number | string;
+  quantity: number | string;
+  orders: number | string;
+}
+
+export interface MarketDepth {
+  buy: MarketDepthLevel[];
+  sell: MarketDepthLevel[];
+}
+
 export interface QuoteData {
   symbol: string;
   tradingSymbol: string;
@@ -22,6 +33,18 @@ export interface QuoteData {
   dataSource?: string;
   marketState?: string;
   currency?: string;
+  depth?: MarketDepth;
+  ohlc?: {
+    open: number | string;
+    high: number | string;
+    low: number | string;
+    close: number | string;
+  };
+  totalBuy?: number | string;
+  totalSell?: number | string;
+  lastTradedQuantity?: number | string;
+  exchangeToken?: string;
+  displaySymbol?: string;
 }
 
 export interface SentimentAnalysis {
@@ -97,6 +120,35 @@ export interface HoldingItem {
   currentValue: number;
   unrealizedPnL: number;
   unrealizedPnLPct: number;
+  instrumentType?: string;
+  sector?: string;
+  instrumentToken?: number | string;
+  commonScripCode?: string;
+  instrumentName?: string;
+  holdingCost?: number;
+  closingPrice?: number;
+  mktValue?: number;
+  scripId?: string;
+  isAlternateScrip?: string | boolean;
+  unrealisedGainLoss?: number;
+  sqGainLoss?: number;
+  delGainLoss?: number;
+  subTotal?: number;
+  prevDayLtp?: number;
+  subType?: string;
+  instrumentStatus?: string;
+  marketLot?: number;
+  expiryDate?: string;
+  optType?: string;
+  strikePrice?: string;
+  displaySymbol?: string;
+  series?: string;
+  exchangeIdentifier?: string;
+  sellableQuantity?: number;
+  securityType?: string;
+  securitySubType?: string;
+  logoUrl?: string;
+  cmotCode?: string;
 }
 
 export interface PositionItem {
@@ -112,6 +164,36 @@ export interface PositionItem {
   sellValue: number;
   averagePrice: number;
   realizedPnL: number;
+  actId?: string;
+  sym?: string;
+  buyAmt?: string | number;
+  sellAmt?: string | number;
+  flBuyQty?: string | number;
+  flSellQty?: string | number;
+  brdLtQty?: number;
+  posFlg?: string;
+  sqrFlg?: string;
+  lotSz?: string | number;
+  stkPrc?: string;
+  hsUpTm?: string;
+  cfBuyAmt?: string;
+  cfSellAmt?: string;
+  cfBuyQty?: string;
+  cfSellQty?: string;
+}
+
+export interface MarginCheckResponse {
+  availableCash: number;
+  availableMargin: number;
+  requiredMargin: number;
+  orderMargin: number;
+  sufficientFunds: boolean;
+  statusMessage: string;
+  totMrgnUsd?: number;
+  mrgnUsd?: number;
+  insufFund?: number;
+  rmsVldtd?: string;
+  stat?: string;
 }
 
 export interface AccountFunds {
@@ -209,6 +291,15 @@ export interface CustomNewsAnalysisRequest {
   text: string;
   selectedCompany?: string;
   selectedTicker?: string;
+}
+
+export interface ExtractedPdfDocument {
+  text: string;
+  pageCount: number;
+  wordCount: number;
+  charCount: number;
+  fileName?: string;
+  fileSizeBytes?: number;
 }
 
 export interface CustomSentenceSentiment {

@@ -16,58 +16,114 @@ import { orderService } from './services/orders/OrderService.js';
 import { backtestService } from './services/backtest/BacktestService.js';
 import { portfolioSyncService } from './services/portfolio/PortfolioSyncService.js';
 import { yahooFinanceService } from './services/market/YahooFinanceService.js';
+import { PdfExtractorService } from './services/pdf/PdfExtractorService.js';
 
 const prisma = new PrismaClient();
 const app = express();
 const server = http.createServer(app);
 const orderFeedWebSocketServer = new WebSocketServer({ noServer: true });
+const marketFeedWebSocketServer = new WebSocketServer({ noServer: true });
 
 server.on('upgrade', (request, socket, head) => {
   const requestUrl = new URL(request.url || '/', `http://${request.headers.host || 'localhost'}`);
-  if (requestUrl.pathname !== '/api/broker/kotak/order-feed') {
-    socket.destroy();
-    return;
-  }
-  if (!kotakNeoBrokerService.isConnected()) {
-    socket.write('HTTP/1.1 409 Conflict\r\nConnection: close\r\n\r\n');
-    socket.destroy();
-    return;
-  }
 
-  orderFeedWebSocketServer.handleUpgrade(request, socket, head, clientSocket => {
-    let upstream: WebSocket;
-    try {
-      upstream = kotakNeoBrokerService.connectOrderFeed();
-    } catch (err) {
-      logger.warn('Unable to open Kotak order feed', {
-        message: err instanceof Error ? err.message : 'Unknown order feed error',
-      });
-      clientSocket.close(1011, 'Unable to open Kotak order feed');
+  if (requestUrl.pathname === '/api/broker/kotak/order-feed') {
+    if (!kotakNeoBrokerService.isConnected()) {
+      socket.write('HTTP/1.1 409 Conflict\r\nConnection: close\r\n\r\n');
+      socket.destroy();
       return;
     }
 
-    const heartbeat = setInterval(() => {
-      if (upstream.readyState === WebSocket.OPEN) upstream.send(JSON.stringify({ type: 'HB' }));
-    }, 25_000);
-    upstream.on('message', (data, isBinary) => {
-      if (clientSocket.readyState === WebSocket.OPEN) clientSocket.send(data, { binary: isBinary });
+    orderFeedWebSocketServer.handleUpgrade(request, socket, head, clientSocket => {
+      let upstream: WebSocket;
+      try {
+        upstream = kotakNeoBrokerService.connectOrderFeed();
+      } catch (err) {
+        logger.warn('Unable to open Kotak order feed', {
+          message: err instanceof Error ? err.message : 'Unknown order feed error',
+        });
+        clientSocket.close(1011, 'Unable to open Kotak order feed');
+        return;
+      }
+
+      const heartbeat = setInterval(() => {
+        if (upstream.readyState === WebSocket.OPEN) upstream.send(JSON.stringify({ type: 'HB' }));
+      }, 25_000);
+      upstream.on('message', (data, isBinary) => {
+        if (clientSocket.readyState === WebSocket.OPEN) clientSocket.send(data, { binary: isBinary });
+      });
+      upstream.on('error', () => {
+        logger.warn('Kotak order feed socket reported an error.');
+        if (clientSocket.readyState === WebSocket.OPEN) clientSocket.close(1011, 'Kotak order feed error');
+      });
+      upstream.on('close', () => {
+        if (clientSocket.readyState === WebSocket.OPEN) clientSocket.close(1012, 'Kotak order feed disconnected');
+      });
+      clientSocket.on('close', () => {
+        clearInterval(heartbeat);
+        upstream.close();
+      });
+      clientSocket.on('error', () => {
+        clearInterval(heartbeat);
+        upstream.close();
+      });
     });
-    upstream.on('error', () => {
-      logger.warn('Kotak order feed socket reported an error.');
-      if (clientSocket.readyState === WebSocket.OPEN) clientSocket.close(1011, 'Kotak order feed error');
+    return;
+  }
+
+  if (requestUrl.pathname === '/api/broker/kotak/market-feed') {
+    if (!kotakNeoBrokerService.isConnected()) {
+      socket.write('HTTP/1.1 409 Conflict\r\nConnection: close\r\n\r\n');
+      socket.destroy();
+      return;
+    }
+
+    marketFeedWebSocketServer.handleUpgrade(request, socket, head, clientSocket => {
+      let upstream: WebSocket;
+      try {
+        upstream = kotakNeoBrokerService.connectMarketFeed();
+      } catch (err) {
+        logger.warn('Unable to open Kotak market feed', {
+          message: err instanceof Error ? err.message : 'Unknown market feed error',
+        });
+        clientSocket.close(1011, 'Unable to open Kotak market feed');
+        return;
+      }
+
+      const heartbeat = setInterval(() => {
+        if (upstream.readyState === WebSocket.OPEN) upstream.send(JSON.stringify({ type: 'HB' }));
+      }, 25_000);
+
+      upstream.on('message', (data, isBinary) => {
+        if (clientSocket.readyState === WebSocket.OPEN) clientSocket.send(data, { binary: isBinary });
+      });
+
+      clientSocket.on('message', (data) => {
+        if (upstream.readyState === WebSocket.OPEN) {
+          upstream.send(data);
+        }
+      });
+
+      upstream.on('error', () => {
+        logger.warn('Kotak market feed socket reported an error.');
+        if (clientSocket.readyState === WebSocket.OPEN) clientSocket.close(1011, 'Kotak market feed error');
+      });
+      upstream.on('close', () => {
+        if (clientSocket.readyState === WebSocket.OPEN) clientSocket.close(1012, 'Kotak market feed disconnected');
+      });
+      clientSocket.on('close', () => {
+        clearInterval(heartbeat);
+        upstream.close();
+      });
+      clientSocket.on('error', () => {
+        clearInterval(heartbeat);
+        upstream.close();
+      });
     });
-    upstream.on('close', () => {
-      if (clientSocket.readyState === WebSocket.OPEN) clientSocket.close(1012, 'Kotak order feed disconnected');
-    });
-    clientSocket.on('close', () => {
-      clearInterval(heartbeat);
-      upstream.close();
-    });
-    clientSocket.on('error', () => {
-      clearInterval(heartbeat);
-      upstream.close();
-    });
-  });
+    return;
+  }
+
+  socket.destroy();
 });
 
 function marketDataHttpStatus(error: unknown): number {
@@ -78,7 +134,16 @@ function marketDataHttpStatus(error: unknown): number {
 }
 
 app.use(cors({ origin: '*' }));
-app.use(express.json());
+app.use(express.json({ limit: '50mb' }));
+app.use(express.urlencoded({ extended: true, limit: '50mb' }));
+
+// Graceful 413 Payload Too Large error handler
+app.use((err: any, req: express.Request, res: express.Response, next: express.NextFunction) => {
+  if (err && (err.type === 'entity.too.large' || err.status === 413)) {
+    return res.status(413).json({ error: 'Uploaded document is too large (maximum allowed size is 50MB).' });
+  }
+  next(err);
+});
 
 // --- 1. AUTH & USER ROUTES ---
 app.post('/api/auth/login', async (req, res) => {
@@ -394,6 +459,30 @@ app.post('/api/broker/kotak/quotes', authMiddleware, async (req, res) => {
   }
 });
 
+app.get('/api/broker/kotak/quote/:symbol', authMiddleware, async (req, res) => {
+  try {
+    const symbol = req.params.symbol;
+    const segment = typeof req.query.segment === 'string' ? req.query.segment : 'nse_cm';
+    const filter = typeof req.query.filter === 'string' ? req.query.filter : 'all';
+    const quote = await kotakNeoBrokerService.getQuotes(segment, symbol, true, filter);
+    res.json(quote);
+  } catch (err: any) {
+    res.status(502).json({ error: err.message || 'Kotak quote request failed.' });
+  }
+});
+
+app.post('/api/broker/kotak/check-margin', authMiddleware, async (req: AuthRequest, res) => {
+  try {
+    if (!kotakNeoBrokerService.isConnected()) {
+      return res.status(409).json({ error: 'Connect Kotak Neo before checking live margin.' });
+    }
+    const marginResult = await kotakNeoBrokerService.checkMargin(req.body);
+    res.json(marginResult);
+  } catch (err: any) {
+    res.status(502).json({ error: err.message || 'Kotak margin check failed.' });
+  }
+});
+
 // --- 3. MARKET DATA ROUTES ---
 app.get('/api/market/instruments', authMiddleware, async (req, res) => {
   try {
@@ -504,6 +593,39 @@ app.post('/api/sentiment/custom-analyze', authMiddleware, async (req, res) => {
       message: err instanceof Error ? err.message : 'Unknown custom news error',
     });
     res.status(502).json({ error: err.message || 'Failed to analyze custom news text.' });
+  }
+});
+
+app.post('/api/sentiment/extract-pdf', authMiddleware, async (req, res) => {
+  try {
+    const { base64Data, fileName, textContent } = req.body || {};
+    if (textContent && typeof textContent === 'string' && textContent.trim()) {
+      const trimmed = textContent.trim();
+      return res.json({
+        text: trimmed,
+        pageCount: 1,
+        wordCount: trimmed.split(/\s+/).filter(Boolean).length,
+        charCount: trimmed.length,
+        fileName: fileName || 'document.txt',
+        fileSizeBytes: Buffer.byteLength(trimmed, 'utf8'),
+      });
+    }
+
+    if (!base64Data || typeof base64Data !== 'string') {
+      return res.status(400).json({ error: 'Please upload a valid PDF or document file.' });
+    }
+
+    // Strip data URI prefix if present (e.g. data:application/pdf;base64,...)
+    const cleanBase64 = base64Data.replace(/^data:[^;]+;base64,/, '');
+    const buffer = Buffer.from(cleanBase64, 'base64');
+
+    const extracted = await PdfExtractorService.extractTextFromPdfBuffer(buffer, fileName);
+    res.json(extracted);
+  } catch (err: any) {
+    logger.warn('PDF extraction failed', {
+      message: err instanceof Error ? err.message : 'Unknown PDF extraction error',
+    });
+    res.status(500).json({ error: err.message || 'Failed to extract text from PDF document.' });
   }
 });
 

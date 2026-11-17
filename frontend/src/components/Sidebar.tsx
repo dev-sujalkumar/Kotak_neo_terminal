@@ -33,7 +33,7 @@ const menuItems: MenuItem[] = [
   { id: 'detail',      label: 'Stock Analysis',      icon: TrendingUp,      group: 'MARKET',     description: 'Deep dive analysis' },
   { id: 'watchlists',  label: 'Watchlists',          icon: Eye,             group: 'MARKET',     description: 'Track instruments' },
   { id: 'sentiment',   label: 'Sentiment Engine',    icon: BrainCircuit,    group: 'AI ENGINE',  badge: 'NLP',  badgeColor: 'purple', description: 'NLP news scoring' },
-  { id: 'custom-news', label: 'Custom News Analyzer', icon: FileText,       group: 'AI ENGINE',  badge: 'NEW',  badgeColor: 'green',  description: 'Paste & analyze text' },
+  { id: 'custom-news', label: 'News Analyser',       icon: FileText,        group: 'AI ENGINE',  badge: 'PDF + AI', badgeColor: 'green',  description: 'Upload PDF & news analysis' },
   { id: 'technical',   label: 'Technical Analysis',  icon: Sliders,         group: 'AI ENGINE',  description: 'Indicators & signals' },
   { id: 'portfolio',   label: 'Portfolio',           icon: Briefcase,       group: 'PORTFOLIO',  description: 'Holdings & P&L' },
   { id: 'orders',      label: 'Orders & Trades',     icon: BookOpenCheck,   group: 'PORTFOLIO',  description: 'Order history' },

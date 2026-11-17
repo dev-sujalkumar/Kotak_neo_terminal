@@ -319,29 +319,42 @@ export class SentimentService {
         symbol: cleanSymbol,
       }));
 
-      const CHUNK_SIZE = 50; // larger chunks → fewer round-trips for 2000 articles
-      const allScoredPayloads: FinBERTSentimentPayload[] = [];
+      const toScore = batchPayload.slice(0, 30);
+      let allScoredPayloads: FinBERTSentimentPayload[] = [];
 
-      for (let i = 0; i < batchPayload.length; i += CHUNK_SIZE) {
-        const slice = batchPayload.slice(i, i + CHUNK_SIZE);
+      try {
         const response = await axios.post<FinBERTSentimentPayload[]>(
           `${config.nlpServiceUrl}/analyze-batch`,
-          { articles: slice },
-          { timeout: 60000 } // 60s per 50-article chunk
+          { articles: toScore },
+          { timeout: 2500 } // 2.5s fast timeout to prevent UI hang
         );
-        allScoredPayloads.push(...response.data);
+        allScoredPayloads = response.data;
+      } catch {
+        // Fall back gracefully if ML service is cold or busy
       }
 
       const scoredArticles = articles.map((article, index) => {
         const item = allScoredPayloads[index];
+        if (item && item.score !== undefined) {
+          return {
+            ...article,
+            score: item.score,
+            sentiment: item.label,
+            positive_score: item.positive_score,
+            negative_score: item.negative_score,
+            neutral_score: item.neutral_score,
+            confidence: item.confidence,
+          };
+        }
+        const local = fallbackLocalScore(`${article.title}. ${article.description || ''}`);
         return {
           ...article,
-          score: item?.score,
-          sentiment: item?.label,
-          positive_score: item?.positive_score,
-          negative_score: item?.negative_score,
-          neutral_score: item?.neutral_score,
-          confidence: item?.confidence,
+          score: local.score,
+          sentiment: local.label,
+          positive_score: local.positive_score,
+          negative_score: local.negative_score,
+          neutral_score: local.neutral_score,
+          confidence: local.confidence,
         };
       });
 
@@ -450,7 +463,7 @@ export class SentimentService {
       };
     }
 
-    const payload = articles.map(article => ({
+    const payload = articles.slice(0, 30).map(article => ({
       text: `${article.title}. ${article.description || ''}`,
       symbol: cleanSymbol,
       publishedAt: article.publishedAt,
@@ -460,7 +473,7 @@ export class SentimentService {
       const response = await axios.post<FinBERTAggregatePayload>(
         `${config.nlpServiceUrl}/aggregate`,
         payload,
-        { params: { symbol: cleanSymbol }, timeout: 120000 } // 2 min for 2000-article aggregation
+        { params: { symbol: cleanSymbol }, timeout: 3000 } // 3s fast timeout to prevent UI hang
       );
       const res = response.data;
 

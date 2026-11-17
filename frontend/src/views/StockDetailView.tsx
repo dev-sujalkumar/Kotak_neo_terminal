@@ -1,11 +1,12 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { TrendingUp, TrendingDown, RefreshCw, ShoppingCart, Sliders, Newspaper, Building2 } from 'lucide-react';
+import { TrendingUp, TrendingDown, RefreshCw, ShoppingCart, Sliders, Newspaper, Building2, Sparkles, ExternalLink } from 'lucide-react';
 import { useStore } from '../store/useStore';
 import { api } from '../services/api';
 import { QuoteData, SentimentAnalysis, TechnicalIndicators, CombinedSignal, NewsArticle } from '../types';
 import { CandlestickChart } from '../components/CandlestickChart';
 import { SentimentGauge } from '../components/SentimentGauge';
 import { SignalExplanationCard } from '../components/SignalExplanationCard';
+import { MarketDepthCard } from '../components/MarketDepthCard';
 import { resolveStock, StockInfo } from '../data/stockRegistry';
 
 const POPULAR = [
@@ -24,7 +25,7 @@ const StatBox = ({ label, value, sub, color = '#8ba5c8' }: { label: string; valu
 );
 
 export const StockDetailView: React.FC = () => {
-  const { selectedSymbol, setSelectedSymbol, openOrderModal } = useStore();
+  const { selectedSymbol, setSelectedSymbol, openOrderModal, setActiveTab, setCustomNewsDraft } = useStore();
   const [quote, setQuote]       = useState<QuoteData | null>(null);
   const [candles, setCandles]   = useState<any[]>([]);
   const [sentiment, setSentiment] = useState<SentimentAnalysis | null>(null);
@@ -34,6 +35,16 @@ export const StockDetailView: React.FC = () => {
   const [loading, setLoading]   = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [refreshKey, setRefreshKey] = useState(0);
+
+  const handleOpenInCustomAnalyzer = (item: NewsArticle) => {
+    setCustomNewsDraft({
+      text: `${item.title}\n\n${item.description || ''}`.trim(),
+      company: '',
+      ticker: selectedSymbol,
+      autoAnalyze: true,
+    });
+    setActiveTab('custom-news');
+  };
 
   // Auto-resolve any typos or aliases in selectedSymbol (e.g. TATAMOTERS -> TATAMOTORS)
   useEffect(() => {
@@ -248,10 +259,11 @@ export const StockDetailView: React.FC = () => {
           )}
         </div>
 
-        {/* Right: Sentiment + Signal */}
+        {/* Right: Sentiment + Signal + Market Depth */}
         <div className="space-y-5">
           <SentimentGauge sentiment={sentiment} />
           <SignalExplanationCard signal={signal} onTradeClick={() => openOrderModal(selectedSymbol, 'BUY')} />
+          <MarketDepthCard quote={quote} onPriceClick={(p) => openOrderModal(selectedSymbol, 'BUY')} />
         </div>
       </div>
 
@@ -302,17 +314,41 @@ export const StockDetailView: React.FC = () => {
                   {article.title}
                 </a>
                 {article.description && <p className="mt-1.5 text-xs leading-relaxed text-gray-400">{article.description}</p>}
-                {article.sentiment && (
-                  <span className={`mt-3 inline-flex rounded-full border px-2 py-1 text-[9px] font-bold ${
-                    article.sentiment === 'POSITIVE'
-                      ? 'border-emerald-500/30 bg-emerald-950/30 text-emerald-300'
-                      : article.sentiment === 'NEGATIVE'
-                        ? 'border-rose-500/30 bg-rose-950/30 text-rose-300'
-                        : 'border-amber-500/30 bg-amber-950/30 text-amber-300'
-                  }`}>
-                    {article.sentiment} · {article.score !== undefined ? article.score.toFixed(2) : '—'}
-                  </span>
-                )}
+                <div className="mt-3 flex flex-wrap items-center justify-between gap-2 border-t border-white/5 pt-2">
+                  <div>
+                    {article.sentiment && (
+                      <span className={`inline-flex items-center gap-1 rounded-full border px-2.5 py-0.5 text-[10px] font-mono font-bold ${
+                        article.sentiment === 'POSITIVE'
+                          ? 'border-emerald-500/30 bg-emerald-950/30 text-emerald-300'
+                          : article.sentiment === 'NEGATIVE'
+                            ? 'border-rose-500/30 bg-rose-950/30 text-rose-300'
+                            : 'border-amber-500/30 bg-amber-950/30 text-amber-300'
+                      }`}>
+                        {article.sentiment === 'POSITIVE' && <TrendingUp className="w-3 h-3" />}
+                        {article.sentiment === 'NEGATIVE' && <TrendingDown className="w-3 h-3" />}
+                        {article.sentiment} · {article.score !== undefined ? (article.score > 0 ? '+' : '') + article.score.toFixed(3) : '—'}
+                      </span>
+                    )}
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <a
+                      href={article.url}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg border border-slate-700 bg-slate-900/60 hover:bg-slate-800 text-slate-300 hover:text-white text-[10px] font-medium transition-all"
+                    >
+                      <ExternalLink className="w-3 h-3 text-cyan-400" />
+                      Original
+                    </a>
+                    <button
+                      onClick={() => handleOpenInCustomAnalyzer(article)}
+                      className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg border border-purple-500/40 bg-purple-500/15 hover:bg-purple-500/25 text-purple-200 hover:text-white text-[10px] font-semibold transition-all"
+                    >
+                      <Sparkles className="w-3 h-3 text-purple-400" />
+                      Analyse in NLP
+                    </button>
+                  </div>
+                </div>
               </article>
             ))}
           </div>
