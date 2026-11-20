@@ -8,6 +8,22 @@ vi.mock('axios');
 const mockedAxios = vi.mocked(axios, true);
 
 describe('FinBERT Sentiment Analysis and Machine Learning Pipeline', () => {
+  it('limits news searches to 10 articles and shares concurrent symbol fetches', async () => {
+    const items = Array.from({ length: 11 }, (_, index) =>
+      `<item><title>Company update ${index}</title><link>https://example.com/${index}</link><pubDate>${new Date(Date.now() - index * 1000).toUTCString()}</pubDate><description>Market update</description></item>`
+    ).join('');
+    mockedAxios.get.mockResolvedValue({ data: `<rss><channel>${items}</channel></rss>` });
+
+    const [first, second] = await Promise.all([
+      googleNewsService.getForSymbol('LOADTEST'),
+      googleNewsService.getForSymbol('LOADTEST'),
+    ]);
+
+    expect(first).toHaveLength(10);
+    expect(second).toHaveLength(10);
+    expect(mockedAxios.get).toHaveBeenCalledTimes(5);
+  });
+
   it('should correctly format and calculate sentiment metrics from FinBERT output', async () => {
     vi.spyOn(googleNewsService, 'getForSymbol').mockResolvedValueOnce([
       {
