@@ -11,6 +11,7 @@ interface CandlestickChartProps {
   ltp: number;
   change?: number;
   changePercent?: number;
+  currencySymbol?: string;
 }
 
 type Indicator = 'EMA' | 'BOLLINGER' | 'RSI' | 'MACD' | 'VOLUME';
@@ -67,7 +68,7 @@ const rsiSeries = (values: number[], period = 14): Array<number | null> =>
   });
 
 export const CandlestickChart: React.FC<CandlestickChartProps> = ({
-  candles, symbol, ltp, change, changePercent,
+  candles, symbol, ltp, change, changePercent, currencySymbol = '₹',
 }) => {
   const [period, setPeriod]    = useState<Period>('1M');
   const [indicator, setIndicator] = useState<Indicator>('EMA');
@@ -132,7 +133,7 @@ export const CandlestickChart: React.FC<CandlestickChartProps> = ({
             <div className="flex items-baseline gap-2">
               <h2 className="text-sm font-bold font-mono text-white">{symbol}<span className="text-[#4a6285]">/INR</span></h2>
               <span className="text-lg font-bold font-mono" style={{ color: ltpColor }}>
-                ₹{ltp.toFixed(2)}
+                {currencySymbol}{ltp.toFixed(2)}
               </span>
               <span className={`text-xs font-mono font-bold ${isPositive ? 'text-[#00ff88]' : 'text-[#ff3366]'}`}>
                 {isPositive ? '+' : ''}{dayChange.toFixed(2)} ({isPositive ? '+' : ''}{dayChangePercent.toFixed(2)}%)
@@ -200,7 +201,8 @@ export const CandlestickChart: React.FC<CandlestickChartProps> = ({
               </defs>
               <CartesianGrid strokeDasharray="2 6" stroke="rgba(255,255,255,0.03)" vertical={false} />
               <XAxis dataKey="date" stroke="transparent" tick={{ fill: '#2a3f5f', fontSize: 9, fontFamily: 'JetBrains Mono' }} tickLine={false} />
-              <YAxis domain={['auto', 'auto']} stroke="transparent" tick={{ fill: '#2a3f5f', fontSize: 9, fontFamily: 'JetBrains Mono' }} tickLine={false} width={55} tickFormatter={v => `₹${v.toFixed(0)}`} />
+              <YAxis domain={['auto', 'auto']} stroke="transparent" tick={{ fill: '#2a3f5f', fontSize: 9, fontFamily: 'JetBrains Mono' }} tickLine={false} width={55} tickFormatter={v => `${currencySymbol}${v.toFixed(0)}`} />
+              <YAxis yAxisId={1} orientation="right" domain={[0, 'dataMax * 3.5']} hide={true} />
               <Tooltip content={<CustomTooltip />} cursor={{ stroke: 'rgba(0,212,255,0.2)', strokeWidth: 1, strokeDasharray: '4 4' }} />
               <Area
                 type="monotone" dataKey="close"
@@ -227,7 +229,7 @@ export const CandlestickChart: React.FC<CandlestickChartProps> = ({
               )}
               {visibleData.length > 0 && (
                 <ReferenceLine y={ltp} stroke="rgba(0,212,255,0.5)" strokeDasharray="5 3" strokeWidth={1}
-                               label={{ value: `₹${ltp.toFixed(0)}`, position: 'right', fill: '#00d4ff', fontSize: 9, fontFamily: 'JetBrains Mono' }} />
+                               label={{ value: `${currencySymbol}${ltp.toFixed(0)}`, position: 'right', fill: '#00d4ff', fontSize: 9, fontFamily: 'JetBrains Mono' }} />
               )}
             </ComposedChart>
           </ResponsiveContainer>

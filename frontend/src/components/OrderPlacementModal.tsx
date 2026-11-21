@@ -348,30 +348,62 @@ export const OrderPlacementModal: React.FC = () => {
               </div>
 
               {/* Quantity & Price */}
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-gray-400 mb-1">Quantity (qt)</label>
-                  <input
-                    type="number"
-                    min="1"
-                    value={quantity}
-                    onChange={(e) => setQuantity(Math.max(1, parseInt(e.target.value) || 1))}
-                    className="w-full bg-gray-900 border border-gray-800 rounded px-3 py-2 text-white focus:outline-none focus:border-cyan-500 font-bold"
-                  />
+              <div className="space-y-2">
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-gray-400 mb-1">Quantity (qt)</label>
+                    <input
+                      type="number"
+                      min="1"
+                      value={quantity}
+                      onChange={(e) => setQuantity(Math.max(1, parseInt(e.target.value) || 1))}
+                      className="w-full bg-gray-900 border border-gray-800 rounded px-3 py-2 text-white focus:outline-none focus:border-cyan-500 font-bold"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-gray-400 mb-1">Limit Price ₹ (pr)</label>
+                    <input
+                      type="number"
+                      min="0.05"
+                      step="0.05"
+                      disabled={orderType === 'MARKET'}
+                      value={price || ''}
+                      placeholder="Current market quote"
+                      onChange={(e) => setPrice(parseFloat(e.target.value) || 0)}
+                      className="w-full bg-gray-900 border border-gray-800 rounded px-3 py-2 text-white focus:outline-none focus:border-cyan-500 font-bold disabled:opacity-50"
+                    />
+                  </div>
                 </div>
 
-                <div>
-                  <label className="block text-gray-400 mb-1">Limit Price ₹ (pr)</label>
-                  <input
-                    type="number"
-                    min="0.05"
-                    step="0.05"
-                    disabled={orderType === 'MARKET'}
-                    value={price || ''}
-                    placeholder="Current market quote"
-                    onChange={(e) => setPrice(parseFloat(e.target.value) || 0)}
-                    className="w-full bg-gray-900 border border-gray-800 rounded px-3 py-2 text-white focus:outline-none focus:border-cyan-500 font-bold disabled:opacity-50"
-                  />
+                {/* Quick Quantity Stepper Pills */}
+                <div className="flex items-center gap-1.5 flex-wrap">
+                  <span className="text-[10px] font-mono text-slate-500 mr-1">Quick:</span>
+                  {[5, 10, 25, 50, 100].map(stepQty => (
+                    <button
+                      key={stepQty}
+                      type="button"
+                      onClick={() => setQuantity(q => q + stepQty)}
+                      className="px-2 py-0.5 rounded-md bg-white/5 hover:bg-cyan-500/20 text-slate-300 hover:text-cyan-300 border border-white/5 hover:border-cyan-500/30 text-[9px] font-mono font-bold transition-all"
+                    >
+                      +{stepQty}
+                    </button>
+                  ))}
+                  <button
+                    type="button"
+                    onClick={() => setQuantity(1)}
+                    className="px-2 py-0.5 rounded-md bg-white/5 hover:bg-rose-500/20 text-slate-400 hover:text-rose-300 border border-white/5 text-[9px] font-mono transition-all ml-auto"
+                  >
+                    Reset
+                  </button>
+                </div>
+
+                {/* Estimated Order Value Banner */}
+                <div className="flex items-center justify-between px-3 py-2 rounded-xl bg-cyan-950/20 border border-cyan-500/20 text-xs font-mono">
+                  <span className="text-slate-400 text-[11px]">Est. Order Value:</span>
+                  <span className="font-bold text-cyan-300 font-mono text-sm">
+                    ₹{((quantity || 0) * (price || 0)).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                  </span>
                 </div>
               </div>
               {quoteStatus && (

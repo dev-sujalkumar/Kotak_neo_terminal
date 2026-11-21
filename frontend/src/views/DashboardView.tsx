@@ -160,6 +160,52 @@ export const DashboardView: React.FC = () => {
         </div>
       )}
 
+      {/* ── MAJOR MARKET INDICES STRIP ── */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+        {[
+          { name: 'NIFTY 50', level: '24,316.65', change: '+102.40', pct: '+0.42%', up: true, low: '24,180', high: '24,385', pctDay: 72 },
+          { name: 'SENSEX', level: '79,802.79', change: '+301.15', pct: '+0.38%', up: true, low: '79,420', high: '79,980', pctDay: 68 },
+          { name: 'BANK NIFTY', level: '52,418.90', change: '-110.35', pct: '-0.21%', up: false, low: '52,150', high: '52,650', pctDay: 48 },
+          { name: 'NIFTY IT', level: '38,940.15', change: '+442.80', pct: '+1.15%', up: true, low: '38,450', high: '39,120', pctDay: 84 },
+        ].map(idx => (
+          <div
+            key={idx.name}
+            className="glass-panel p-3.5 space-y-2 relative overflow-hidden group hover:border-cyan-500/30 transition-all"
+          >
+            <div className="flex items-center justify-between">
+              <span className="text-[10px] font-mono font-bold tracking-wider text-slate-400 uppercase">{idx.name}</span>
+              <span className={`inline-flex items-center gap-0.5 text-[9px] font-mono font-bold px-1.5 py-0.5 rounded ${
+                idx.up ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' : 'bg-rose-500/10 text-rose-400 border border-rose-500/20'
+              }`}>
+                {idx.up ? <TrendingUp className="w-2.5 h-2.5" /> : <TrendingDown className="w-2.5 h-2.5" />}
+                {idx.pct}
+              </span>
+            </div>
+            <div className="flex items-baseline justify-between">
+              <div className="text-lg font-bold font-mono text-white tracking-tight">
+                {idx.level}
+              </div>
+              <span className={`text-[10px] font-mono font-semibold ${idx.up ? 'text-emerald-400' : 'text-rose-400'}`}>
+                {idx.change}
+              </span>
+            </div>
+            {/* Day Range mini meter */}
+            <div className="space-y-1">
+              <div className="h-1 rounded-full bg-white/5 overflow-hidden flex">
+                <div
+                  className={`h-full rounded-full ${idx.up ? 'bg-gradient-to-r from-emerald-500 to-cyan-400' : 'bg-gradient-to-r from-rose-500 to-amber-500'}`}
+                  style={{ width: `${idx.pctDay}%` }}
+                />
+              </div>
+              <div className="flex justify-between text-[8px] font-mono text-slate-500">
+                <span>L: {idx.low}</span>
+                <span>H: {idx.high}</span>
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
+
       {/* ── MARKET TICKER CARDS ── */}
       <div>
         <div className="flex items-center gap-2 mb-3">
@@ -172,46 +218,75 @@ export const DashboardView: React.FC = () => {
             ? SYMBOLS.map(s => <SkeletonCard key={s} />)
             : topStocks.length > 0
               ? topStocks.map((stk, idx) => (
-              <button
+              <div
                 key={stk.symbol}
-                onClick={() => { setSelectedSymbol(stk.symbol); setActiveTab('detail'); }}
-                className="metric-card text-left group hover-lift cursor-pointer relative"
+                className="metric-card text-left group hover-lift relative overflow-hidden flex flex-col justify-between"
                 style={{ animationDelay: `${idx * 0.07}s` }}
               >
-                <div className="flex justify-between items-start mb-3">
-                  <div>
-                    <span className="text-[8px] font-mono font-bold text-[#637286] uppercase tracking-widest">NSE</span>
-                    <div className="text-xs font-bold font-mono text-white group-hover:text-[#54d6cf] transition-colors mt-0.5">
-                      {stk.symbol}
+                <button
+                  type="button"
+                  onClick={() => { setSelectedSymbol(stk.symbol); setActiveTab('detail'); }}
+                  className="w-full text-left"
+                >
+                  <div className="flex justify-between items-start mb-2">
+                    <div>
+                      <span className="text-[8px] font-mono font-bold text-[#637286] uppercase tracking-widest">NSE</span>
+                      <div className="text-xs font-bold font-mono text-white group-hover:text-[#54d6cf] transition-colors mt-0.5">
+                        {stk.symbol}
+                      </div>
                     </div>
+                    <ArrowUpRight className="w-3.5 h-3.5 text-[#2a3f5f] group-hover:text-[#54d6cf]
+                                              transition-all duration-200 group-hover:translate-x-0.5 group-hover:-translate-y-0.5 mt-1" />
                   </div>
-                  <ArrowUpRight className="w-3.5 h-3.5 text-[#2a3f5f] group-hover:text-[#54d6cf]
-                                            transition-all duration-200 group-hover:translate-x-0.5 group-hover:-translate-y-0.5 mt-1" />
-                </div>
-                <div className="text-xl font-bold font-mono text-white group-hover:text-[#54d6cf] transition-colors mb-2">
-                  ₹{stk.ltp?.toFixed(2)}
-                </div>
-                <div className={`flex items-center gap-1 text-[11px] font-mono font-bold mb-3
-                                ${stk.change >= 0 ? 'text-[#65d5a8]' : 'text-[#d87885]'}`}>
-                  {stk.change >= 0
-                    ? <TrendingUp className="w-3.5 h-3.5" />
-                    : <TrendingDown className="w-3.5 h-3.5" />}
-                  {stk.change >= 0 ? '+' : ''}{stk.changePercent?.toFixed(2)}%
-                </div>
-                {/* Mini sparkline bar */}
-                <div className="h-1 rounded-full overflow-hidden bg-[rgba(255,255,255,0.04)]">
-                  <div
-                    className="h-full rounded-full transition-all duration-1000"
-                    style={{
-                      width: `${Math.min(100, Math.abs(stk.changePercent || 0) * 20 + 30)}%`,
-                      background: stk.change >= 0
-                        ? 'linear-gradient(90deg, rgba(46,179,131,0.6), rgba(84,214,207,0.8))'
-                        : 'linear-gradient(90deg, rgba(198,76,90,0.6), rgba(255,100,120,0.8))',
-                      boxShadow: stk.change >= 0 ? '0 0 8px rgba(84,214,207,0.4)' : '0 0 8px rgba(198,76,90,0.4)'
+                  <div className="text-xl font-bold font-mono text-white group-hover:text-[#54d6cf] transition-colors mb-1.5">
+                    ₹{stk.ltp?.toFixed(2)}
+                  </div>
+                  <div className={`flex items-center gap-1 text-[11px] font-mono font-bold mb-3
+                                  ${stk.change >= 0 ? 'text-[#65d5a8]' : 'text-[#d87885]'}`}>
+                    {stk.change >= 0
+                      ? <TrendingUp className="w-3.5 h-3.5" />
+                      : <TrendingDown className="w-3.5 h-3.5" />}
+                    {stk.change >= 0 ? '+' : ''}{stk.changePercent?.toFixed(2)}%
+                  </div>
+                  {/* Mini sparkline bar */}
+                  <div className="h-1 rounded-full overflow-hidden bg-[rgba(255,255,255,0.04)] mb-2">
+                    <div
+                      className="h-full rounded-full transition-all duration-1000"
+                      style={{
+                        width: `${Math.min(100, Math.abs(stk.changePercent || 0) * 20 + 30)}%`,
+                        background: stk.change >= 0
+                          ? 'linear-gradient(90deg, rgba(46,179,131,0.6), rgba(84,214,207,0.8))'
+                          : 'linear-gradient(90deg, rgba(198,76,90,0.6), rgba(255,100,120,0.8))',
+                        boxShadow: stk.change >= 0 ? '0 0 8px rgba(84,214,207,0.4)' : '0 0 8px rgba(198,76,90,0.4)'
+                      }}
+                    />
+                  </div>
+                </button>
+
+                {/* 1-Click Quick Trade Bar */}
+                <div className="pt-2 border-t border-white/5 flex items-center gap-1.5 opacity-90 group-hover:opacity-100 transition-opacity">
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      openOrderModal(stk.symbol, 'BUY');
                     }}
-                  />
+                    className="flex-1 py-1 rounded-md bg-emerald-500/10 hover:bg-emerald-500/25 border border-emerald-500/30 text-emerald-400 text-[9px] font-mono font-bold tracking-wider text-center transition-all"
+                  >
+                    BUY
+                  </button>
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      openOrderModal(stk.symbol, 'SELL');
+                    }}
+                    className="flex-1 py-1 rounded-md bg-rose-500/10 hover:bg-rose-500/25 border border-rose-500/30 text-rose-400 text-[9px] font-mono font-bold tracking-wider text-center transition-all"
+                  >
+                    SELL
+                  </button>
                 </div>
-              </button>
+              </div>
               ))
               : (
                 <div className="col-span-full glass-panel flex min-h-28 items-center gap-3 px-5 py-4 text-sm text-slate-400">
@@ -238,7 +313,7 @@ export const DashboardView: React.FC = () => {
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
           <div style={{ animationDelay: '0.15s' }}><SentimentGauge sentiment={sentiment} loading={loading} /></div>
           <div style={{ animationDelay: '0.25s' }}>
-            <SignalExplanationCard signal={signal} loading={loading} onTradeClick={() => openOrderModal('TCS', 'BUY')} />
+            <SignalExplanationCard signal={signal} loading={loading} onTradeClick={() => openOrderModal(activeSym, 'BUY')} />
           </div>
         </div>
       </div>

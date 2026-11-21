@@ -28,7 +28,8 @@ export const Header: React.FC<{ onMenuClick: () => void }> = ({ onMenuClick }) =
     isTradingModeVerified,
     setTradingMode,
     isKotakConnected,
-    openOrderModal
+    openOrderModal,
+    user,
   } = useStore();
 
   const [searchInput, setSearchInput] = useState('');
@@ -401,39 +402,51 @@ export const Header: React.FC<{ onMenuClick: () => void }> = ({ onMenuClick }) =
 
         {/* RIGHT: Controls */}
         <div className="app-header-controls flex items-center gap-2 lg:gap-3 shrink-0 animate-fade-right">
-          {/* Trading Mode Toggle */}
-          <div className="hidden sm:flex items-center bg-[rgba(255,255,255,0.03)] border border-[rgba(173,190,208,0.1)] rounded-xl p-0.5">
-            <button
-              type="button"
-              onClick={() => switchMode('PAPER')}
-              disabled={!isTradingModeVerified}
-              title={!isTradingModeVerified ? 'Verifying trading mode' : 'Switch to paper trading'}
-              aria-pressed={tradingMode === 'PAPER'}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[10px] font-mono font-bold transition-all duration-200
-                ${tradingMode === 'PAPER'
-                  ? 'bg-gradient-to-r from-[rgba(221,164,68,0.18)] to-[rgba(221,164,68,0.1)] text-[#e4bd72] border border-[rgba(221,164,68,0.25)] shadow-[0_0_10px_rgba(221,164,68,0.12)]'
-                  : 'text-[#637286] hover:text-[#a2afbd]'}`}
-            >
-              <Layers className="w-3 h-3" />
-              PAPER
-            </button>
-            <button
-              type="button"
-              onClick={() => switchMode('LIVE')}
-              disabled={!isTradingModeVerified}
-              title={!isTradingModeVerified ? 'Verifying trading mode' : 'Switch to live trading'}
-              aria-pressed={tradingMode === 'LIVE'}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[10px] font-mono font-bold transition-all duration-200
-                ${tradingMode === 'LIVE'
-                  ? 'bg-gradient-to-r from-[rgba(46,179,131,0.18)] to-[rgba(46,179,131,0.1)] text-[#65d5a8] border border-[rgba(46,179,131,0.25)] shadow-[0_0_10px_rgba(46,179,131,0.12)]'
-                  : 'text-[#637286] hover:text-[#a2afbd]'}`}
-            >
-              <Zap className="w-3 h-3" />
-              LIVE
-            </button>
+          {/* Trading Mode Toggle & Balance */}
+          <div className="hidden sm:flex items-center gap-2">
+            <div className="flex items-center bg-[rgba(255,255,255,0.03)] border border-[rgba(173,190,208,0.1)] rounded-xl p-0.5">
+              <button
+                type="button"
+                onClick={() => switchMode('PAPER')}
+                disabled={!isTradingModeVerified}
+                title={!isTradingModeVerified ? 'Verifying trading mode' : 'Switch to paper trading'}
+                aria-pressed={tradingMode === 'PAPER'}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[10px] font-mono font-bold transition-all duration-200
+                  ${tradingMode === 'PAPER'
+                    ? 'bg-gradient-to-r from-[rgba(221,164,68,0.18)] to-[rgba(221,164,68,0.1)] text-[#e4bd72] border border-[rgba(221,164,68,0.25)] shadow-[0_0_10px_rgba(221,164,68,0.12)]'
+                    : 'text-[#637286] hover:text-[#a2afbd]'}`}
+              >
+                <Layers className="w-3 h-3" />
+                PAPER
+              </button>
+              <button
+                type="button"
+                onClick={() => switchMode('LIVE')}
+                disabled={!isTradingModeVerified}
+                title={!isTradingModeVerified ? 'Verifying trading mode' : 'Switch to live trading'}
+                aria-pressed={tradingMode === 'LIVE'}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[10px] font-mono font-bold transition-all duration-200
+                  ${tradingMode === 'LIVE'
+                    ? 'bg-gradient-to-r from-[rgba(46,179,131,0.18)] to-[rgba(46,179,131,0.1)] text-[#65d5a8] border border-[rgba(46,179,131,0.25)] shadow-[0_0_10px_rgba(46,179,131,0.12)]'
+                    : 'text-[#637286] hover:text-[#a2afbd]'}`}
+              >
+                <Zap className="w-3 h-3" />
+                LIVE
+              </button>
+            </div>
+
+            {tradingMode === 'PAPER' && (
+              <div
+                title="Virtual Paper Trading Balance"
+                className="hidden xl:flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-[rgba(245,158,11,0.06)] border border-[rgba(245,158,11,0.2)] text-[10px] font-mono font-bold text-amber-300 shadow-[0_0_10px_rgba(245,158,11,0.08)]"
+              >
+                <span className="text-[9px] text-amber-500/80 uppercase">Cash:</span>
+                <span>₹{(user?.paperBalance ?? 1000000).toLocaleString('en-IN', { maximumFractionDigits: 0 })}</span>
+              </div>
+            )}
           </div>
 
-          {/* Kotak Connection */}
+          {/* Kotak Connection Status */}
           <button
             onClick={() => setActiveTab('kotak-setup')}
             className={`flex items-center gap-1.5 px-2.5 py-2 rounded-xl text-[10px] font-mono font-bold border transition-all duration-200
@@ -444,19 +457,30 @@ export const Header: React.FC<{ onMenuClick: () => void }> = ({ onMenuClick }) =
             {isKotakConnected
               ? <ShieldCheck className="w-3.5 h-3.5" />
               : <ShieldAlert className="w-3.5 h-3.5" />}
-            <span className="hidden sm:inline">{isKotakConnected ? 'NEO CONNECTED' : 'OFFLINE'}</span>
+            <span className="hidden sm:inline">{isKotakConnected ? 'NEO CONNECTED' : 'BROKER OFFLINE'}</span>
           </button>
 
-          {/* Quick Trade Button */}
-          <button
-            onClick={() => openOrderModal(selectedSymbol, 'BUY')}
-            disabled={!isTradingModeVerified}
-            title={!isTradingModeVerified ? 'Trading mode verification is required before placing orders' : 'Open order ticket'}
-            className="btn-buy h-10 px-4 text-[10px] font-mono font-bold flex items-center gap-1.5 whitespace-nowrap relative overflow-hidden"
-          >
-            <Zap className="w-3.5 h-3.5 fill-current" />
-            TRADE
-          </button>
+          {/* Direct Buy/Sell for active stock */}
+          <div className="flex items-center gap-1.5">
+            <button
+              onClick={() => openOrderModal(selectedSymbol, 'BUY')}
+              disabled={!isTradingModeVerified}
+              title={`Buy ${selectedSymbol}`}
+              className="btn-buy h-10 px-3.5 text-[10px] font-mono font-bold flex items-center gap-1.5 whitespace-nowrap relative overflow-hidden"
+            >
+              <TrendingUp className="w-3.5 h-3.5" />
+              BUY
+            </button>
+            <button
+              onClick={() => openOrderModal(selectedSymbol, 'SELL')}
+              disabled={!isTradingModeVerified}
+              title={`Sell ${selectedSymbol}`}
+              className="btn-sell h-10 px-3.5 text-[10px] font-mono font-bold flex items-center gap-1.5 whitespace-nowrap relative overflow-hidden"
+            >
+              <TrendingDown className="w-3.5 h-3.5" />
+              SELL
+            </button>
+          </div>
         </div>
       </div>
 
