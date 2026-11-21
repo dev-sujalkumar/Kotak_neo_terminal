@@ -146,9 +146,10 @@ export function classifyFinancialNewsCategory(title: string, description: string
   return bestCategory || symbolCategoryMap[sym] || 'Macro & Regulatory';
 }
 
-const CACHE_TTL_MS = 10 * 60_000; // 10-min cache for large 2000-article sets
-const MAX_ARTICLES = 2000;
+const CACHE_TTL_MS = 10 * 60_000;
+const MAX_ARTICLES = 10;
 const cache = new Map<string, { expiresAt: number; articles: StockNewsArticle[] }>();
+const pending = new Map<string, Promise<StockNewsArticle[]>>();
 
 const companyNames: Record<string, string> = {
   TCS: 'Tata Consultancy Services',
@@ -303,10 +304,9 @@ function readTag(xml: string, name: string): string {
 
 export class GoogleNewsService {
   /**
-   * Fetches up to MAX_ARTICLES (2000) deduplicated financial news articles
-   * using 40+ parallel RSS queries across diverse topic angles.
+   * Fetches up to MAX_ARTICLES recent financial news articles.
    */
-  public async getForSymbol(inputSymbol: string, requestedLimit = 2000): Promise<StockNewsArticle[]> {
+  public async getForSymbol(inputSymbol: string, requestedLimit = MAX_ARTICLES): Promise<StockNewsArticle[]> {
     const symbol = inputSymbol.trim().toUpperCase().replace(/\.(NS|BO)$/, '');
     if (!/^[A-Z0-9][A-Z0-9&._\-\s]{0,24}$/i.test(symbol)) {
       throw new Error('Enter a valid stock symbol to search related news.');
@@ -317,6 +317,23 @@ export class GoogleNewsService {
       return cached.articles.slice(0, Math.min(requestedLimit, MAX_ARTICLES));
     }
 
+    let fetchPromise = pending.get(symbol);
+    if (!fetchPromise) {
+      fetchPromise = this.fetchForSymbol(symbol);
+      pending.set(symbol, fetchPromise);
+    }
+
+    try {
+      const articles = await fetchPromise;
+      return articles.slice(0, Math.min(requestedLimit, MAX_ARTICLES));
+    } finally {
+      if (pending.get(symbol) === fetchPromise) {
+        pending.delete(symbol);
+      }
+    }
+  }
+
+  private async fetchForSymbol(symbol: string): Promise<StockNewsArticle[]> {
     const company = companyNames[symbol] || symbol;
     const sym = symbol;
 
@@ -400,7 +417,7 @@ export class GoogleNewsService {
     }
 
     cache.set(symbol, { articles: distinct, expiresAt: Date.now() + CACHE_TTL_MS });
-    return distinct.slice(0, Math.min(requestedLimit, MAX_ARTICLES));
+    return distinct.slice(0, MAX_ARTICLES);
   }
 
   /**

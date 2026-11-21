@@ -310,7 +310,7 @@ export class SentimentService {
    */
   public async getNewsForSymbol(symbol: string): Promise<StockNewsArticle[]> {
     const cleanSymbol = symbol.trim().toUpperCase().replace(/\.(NS|BO)$/, '');
-    const articles = await googleNewsService.getForSymbol(cleanSymbol, 2000);
+    const articles = await googleNewsService.getForSymbol(cleanSymbol);
     if (articles.length === 0) return articles;
 
     try {
@@ -441,7 +441,7 @@ export class SentimentService {
     insights?: string;
   }> {
     const cleanSymbol = symbol.trim().toUpperCase().replace(/\.(NS|BO)$/, '');
-    const articles = await googleNewsService.getForSymbol(cleanSymbol, 2000);
+    const articles = await googleNewsService.getForSymbol(cleanSymbol);
     
     if (articles.length === 0) {
       return {
